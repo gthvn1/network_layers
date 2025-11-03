@@ -1,0 +1,101 @@
+const std = @import("std");
+const posix = std.posix;
+
+pub fn main() !void {
+    const iface = "veth0-peer";
+    const my_mac = [_]u8{ 0x02, 0x42, 0xac, 0x11, 0x00, 0x02 };
+    const my_ip = [_]u8{ 10, 0, 0, 2 };
+
+    const sock = try posix.socket(posix.AF.PACKET, posix.SOCK_RAW, posix.htons(posix.ETH_P_ALL));
+    defer posix.close(sock);
+
+    // Get the interface index
+    var ifr: std.os.ifreq = undefined;
+    @memset(&ifr, 0, @sizeOf(std.os.ifreq));
+    std.mem.copy(u8, ifr.ifr_name[0..iface.len], iface);
+    ifr.ifr_name[iface.len] = 0;
+    try posix.ioctl(sock, std.os.SIOCGIFINDEX, &ifr);
+    const ifindex = ifr.ifr_ifindex;
+
+    // Bind the socket to that interface
+    var addr: posix.sockaddr_ll = .{
+        .sll_family = posix.AF.PACKET,
+        .sll_protocol = posix.htons(posix.ETH_P_ALL),
+        .sll_ifindex = ifindex,
+        .sll_hatype = 0,
+        .sll_pkttype = 0,
+        .sll_halen = 6,
+        .sll_addr = undefined,
+    };
+    std.mem.copy(u8, addr.sll_addr[0..6], my_mac);
+    try posix.bind(sock, @ptrCast(&addr), @sizeOf(posix.sockaddr_ll));
+
+    var buf: [2048]u8 = undefined;
+
+    std.debug.print("Listening on {s} ({X:0>2}:{X:0>2}:{X:0>2}:{X:0>2}:{X:0>2}:{X:0>2})...\n", .{ iface, my_mac[0], my_mac[1], my_mac[2], my_mac[3], my_mac[4], my_mac[5] });
+
+    while (true) {
+        const n = try posix.read(sock, &buf);
+        if (n < 42) continue; // too short
+
+        // Ethernet header
+        const dst_mac = buf[0..6];
+        const src_mac = buf[6..12];
+        const ethertype = std.mem.readIntBig(u16, buf[12..14]);
+
+        switch (ethertype) {
+            0x0806 => handleArp(sock, &buf, n, my_mac, my_ip),
+            0x0800 => handleIp(sock, &buf, n, my_mac, my_ip),
+            else => {},
+        }
+    }
+}
+
+fn handleArp(sock: posix.fd_t, frame: []u8, n: usize, my_mac: []const u8, my_ip: []const u8) void {
+    if (n < 42) return;
+
+    const op = std.mem.readIntBig(u16, frame[20..22]);
+    const target_ip = frame[38..42];
+
+    if (op == 1 and std.mem.eql(u8, target_ip, my_ip)) {
+        var reply = frame[0..42].*; // copy base
+        // Swap MACs
+        std.mem.copy(u8, reply[0..6], frame[6..12]); // dst
+        std.mem.copy(u8, reply[6..12], my_mac); // src
+        // Ethernet type stays 0x0806
+        std.mem.writeIntBig(u16, reply[20..22], 2); // ARP reply
+        std.mem.copy(u8, reply[22..28], my_mac); // sender MAC
+        std.mem.copy(u8, reply[28..32], my_ip); // sender IP
+        std.mem.copy(u8, reply[32..38], frame[22..28]); // target MAC
+        std.mem.copy(u8, reply[38..42], frame[28..32]); // target IP
+
+        _ = posix.write(sock, &reply);
+        std.debug.print("Replied to ARP from {X:0>2}:{X:0>2}:{X:0>2}:{X:0>2}:{X:0>2}:{X:0>2}\n", .{ frame[6], frame[7], frame[8], frame[9], frame[10], frame[11] });
+    }
+}
+
+fn handleIp(sock: posix.fd_t, frame: []u8, n: usize, my_mac: []const u8, my_ip: []const u8) void {
+    if (n < 42) return;
+    const proto = frame[23];
+    const dst_ip = frame[30..34];
+    if (!std.mem.eql(u8, dst_ip, my_ip)) return;
+
+    if (proto == 1) { // ICMP
+        const icmp_type = frame[34];
+        if (icmp_type == 8) { // echo request
+            var reply = frame[0..n].*;
+            // swap MACs
+            std.mem.copy(u8, reply[0..6], frame[6..12]);
+            std.mem.copy(u8, reply[6..12], my_mac);
+            // swap IPs
+            std.mem.copy(u8, reply[26..30], frame[30..34]);
+            std.mem.copy(u8, reply[30..34], frame[26..30]);
+            reply[34] = 0; // type = echo reply
+            // recalc checksum (quick fix)
+            reply[36] = 0;
+            reply[37] = 0;
+            _ = posix.write(sock, &reply);
+            std.debug.print("Replied to ICMP echo from {d}.{d}.{d}.{d}\n", .{ frame[26], frame[27], frame[28], frame[29] });
+        }
+    }
+}
