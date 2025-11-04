@@ -8,6 +8,7 @@
   - ARP (Address Resolution Protocol): [RFC 826](https://datatracker.ietf.org/doc/html/rfc826)
   - IPv6 over Ethernet: [RFC 2464](https://datatracker.ietf.org/doc/html/rfc2464)
 - To build and run: `zig build && ./zig-out/bin/netl2`
+  - You need to be root or set capabilite. See `cap_net_raw+ep` below.
 
 # Tests
 

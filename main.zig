@@ -25,9 +25,7 @@ pub fn main() void {
 
     // Packet socket address
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
-    // TODO:  Set physical layer protocol to htons(ETH_P_ALL), so all protocols are received.
-    // But we didn't find it in Zig Lib
-    const phys_layer_protocol = 0;
+    const phys_layer_protocol = std.os.linux.ETH.P.ALL; // Every packet !!!
     const iface_number = std.c.if_nametoindex(iface);
     const arp_hw_type = 0;
     const packet_type = std.os.linux.PACKET.BROADCAST;
