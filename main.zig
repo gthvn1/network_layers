@@ -1,7 +1,7 @@
 const std = @import("std");
 const posix = std.posix;
 
-pub fn main() !void {
+pub fn main() void {
     const iface = "veth0-peer";
     const mac: []const u8 = &[_]u8{ 0x96, 0x6a, 0x35, 0x42, 0xad, 0x06 };
     const ip = [_]u8{ 192, 168, 0, 3 };
@@ -14,7 +14,10 @@ pub fn main() !void {
     // Protocol: specifies a protocol to be used. Normally one protocol matches a particular socket,
     //           so 0 should be fine.
     const family = posix.AF.PACKET;
-    const sock = try posix.socket(family, posix.SOCK.RAW, 0);
+    const sock = posix.socket(family, posix.SOCK.RAW, 0) catch |err| {
+        std.log.err("Failed to create endpoint: {s}", .{@errorName(err)});
+        return;
+    };
     defer posix.close(sock);
 
     std.log.info("Socket created", .{});
@@ -43,14 +46,21 @@ pub fn main() !void {
         .addr = addr_copy,
     };
 
-    try posix.bind(sock, @ptrCast(&addr), @sizeOf(std.os.linux.sockaddr.ll));
+    posix.bind(sock, @ptrCast(&addr), @sizeOf(std.os.linux.sockaddr.ll)) catch |err| {
+        std.log.err("Failed to bound endpoint: {s}", .{@errorName(err)});
+        return;
+    };
     std.log.info("Bound to interface {s}", .{iface});
 
     const buf_size: comptime_int = 2048;
     var buf: [buf_size]u8 = undefined;
 
     while (true) {
-        const n = try posix.read(sock, &buf);
+        const n = posix.read(sock, &buf) catch |err| {
+            std.log.err("Failed to read data: {s}", .{@errorName(err)});
+            return;
+        };
+
         if (n > 0) {
             std.debug.print("Received {d} bytes: ", .{n});
             for (buf[0..n]) |b| {
