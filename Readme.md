@@ -8,7 +8,9 @@
   - ARP (Address Resolution Protocol): [RFC 826](https://datatracker.ietf.org/doc/html/rfc826)
   - IPv6 over Ethernet: [RFC 2464](https://datatracker.ietf.org/doc/html/rfc2464)
 
-# Create virtual cable
+# Tests
+
+## Create virtual cable
 
 We will create a *veth* pair, which acts like a virtual Ethernet cable connecting two interfaces.
 One side can be configured on the host with an IP address and used like a normal network interface.
@@ -34,7 +36,7 @@ It creates:
 
 Add an IP: 192.168.38.0/24 (allow 192.168.38.1 to 192.168.38.254)
 ```sh
-# ip addr add 192.168.38.1/24 dev veth0
+# ip addr add 192.168.38.2/24 dev veth0
 ```
 
 Links up:
@@ -51,7 +53,7 @@ You should now see:
        valid_lft forever preferred_lft forever
 4: veth0@veth0-peer: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
     link/ether ba:71:bd:65:2a:4a brd ff:ff:ff:ff:ff:ff
-    inet 192.168.38.1/24 scope global veth0
+    inet 192.168.38.2/24 scope global veth0
        valid_lft forever preferred_lft forever
     inet6 fe80::b871:bdff:fe65:2a4a/64 scope link proto kernel_ll
        valid_lft forever preferred_lft forever
@@ -60,21 +62,27 @@ You should now see:
 NOTE: Note that raw sockets (AF_PACKET) require root privileges or CAP_NET_RAW.
       To run unprivileged, we can: `sudo setcap cap_net_raw+ep ./zig_program`
 
-- For testing we can listen on *veth0-peer* using tshark:
-```sh
-# tshark -i veth0-peer -V
+- For testing you can use `arping -c 1 192.168.38.3`
+
+- You can also get raw data: `tshark -i veth0-peer -w - | xxd`
+```
+000000f0: 0600 0000 4c00 0000 0000 0000 aedd 7418  ....L.........t.
+00000100: a67e d090 2a00 0000 2a00 0000 ffff ffff  .~..*...*.......
+00000110: ffff c631 4c31 7104 0806 0001 0800 0604  ...1L1q.........
+00000120: 0001 c631 4c31 7104 c0a8 2602 ffff ffff  ...1L1q...&..... 
+```
+- or decode info: `tshark -i veth0-peer -V`
+```
 Capturing on 'veth0-peer'
-3 Frame 1: 42 bytes on wire (336 bits), 42 bytes captured (336 bits) on interface veth0-peer, id 0
+Frame 1: Packet, 42 bytes on wire (336 bits), 42 bytes captured (336 bits) on interface veth0-peer, id 0
     Section number: 1
     Interface id: 0 (veth0-peer)
         Interface name: veth0-peer
     Encapsulation type: Ethernet (1)
-    Arrival Time: Nov  3, 2025 21:29:49.283657738 CET
-    UTC Arrival Time: Nov  3, 2025 20:29:49.283657738 UTC
-    Epoch Arrival Time: 1762201789.283657738
+    Arrival Time: Nov  4, 2025 18:31:51.789530219 CET
+    UTC Arrival Time: Nov  4, 2025 17:31:51.789530219 UTC
+    Epoch Arrival Time: 1762277511.789530219
     [Time shift for this packet: 0.000000000 seconds]
-    [Time delta from previous captured frame: 0.000000000 seconds]
-    [Time delta from previous displayed frame: 0.000000000 seconds]
     [Time since reference or first frame: 0.000000000 seconds]
     Frame Number: 1
     Frame Length: 42 bytes (336 bits)
@@ -82,11 +90,12 @@ Capturing on 'veth0-peer'
     [Frame is marked: False]
     [Frame is ignored: False]
     [Protocols in frame: eth:ethertype:arp]
-Ethernet II, Src: ba:71:bd:65:2a:4a (ba:71:bd:65:2a:4a), Dst: Broadcast (ff:ff:ff:ff:ff:ff)
+    Character encoding: ASCII (0)
+Ethernet II, Src: c6:31:4c:31:71:04 (c6:31:4c:31:71:04), Dst: Broadcast (ff:ff:ff:ff:ff:ff)
     Destination: Broadcast (ff:ff:ff:ff:ff:ff)
         .... ..1. .... .... .... .... = LG bit: Locally administered address (this is NOT the factory default)
         .... ...1 .... .... .... .... = IG bit: Group address (multicast/broadcast)
-    Source: ba:71:bd:65:2a:4a (ba:71:bd:65:2a:4a)
+    Source: c6:31:4c:31:71:04 (c6:31:4c:31:71:04)
         .... ..1. .... .... .... .... = LG bit: Locally administered address (this is NOT the factory default)
         .... ...0 .... .... .... .... = IG bit: Individual address (unicast)
     Type: ARP (0x0806)
@@ -97,55 +106,9 @@ Address Resolution Protocol (request)
     Hardware size: 6
     Protocol size: 4
     Opcode: request (1)
-    Sender MAC address: ba:71:bd:65:2a:4a (ba:71:bd:65:2a:4a)
-    Sender IP address: 192.168.38.1
-    Target MAC address: 00:00:00_00:00:00 (00:00:00:00:00:00)
-    Target IP address: 192.168.38.2
-
-Frame 2: 42 bytes on wire (336 bits), 42 bytes captured (336 bits) on interface veth0-peer, id 0
-    Section number: 1
-    Interface id: 0 (veth0-peer)
-        Interface name: veth0-peer
-    Encapsulation type: Ethernet (1)
-    Arrival Time: Nov  3, 2025 21:29:50.284146965 CET
-    UTC Arrival Time: Nov  3, 2025 20:29:50.284146965 UTC
-    Epoch Arrival Time: 1762201790.284146965
-    [Time shift for this packet: 0.000000000 seconds]
-    [Time delta from previous captured frame: 1.000489227 seconds]
-    [Time delta from previous displayed frame: 1.000489227 seconds]
-    [Time since reference or first frame: 1.000489227 seconds]
-    Frame Number: 2
-    Frame Length: 42 bytes (336 bits)
-    Capture Length: 42 bytes (336 bits)
-    [Frame is marked: False]
-    [Frame is ignored: False]
-    [Protocols in frame: eth:ethertype:arp]
-Ethernet II, Src: ba:71:bd:65:2a:4a (ba:71:bd:65:2a:4a), Dst: Broadcast (ff:ff:ff:ff:ff:ff)
-    Destination: Broadcast (ff:ff:ff:ff:ff:ff)
-        .... ..1. .... .... .... .... = LG bit: Locally administered address (this is NOT the factory default)
-        .... ...1 .... .... .... .... = IG bit: Group address (multicast/broadcast)
-    Source: ba:71:bd:65:2a:4a (ba:71:bd:65:2a:4a)
-        .... ..1. .... .... .... .... = LG bit: Locally administered address (this is NOT the factory default)
-        .... ...0 .... .... .... .... = IG bit: Individual address (unicast)
-    Type: ARP (0x0806)
-    [Stream index: 0]
-Address Resolution Protocol (request)
-    Hardware type: Ethernet (1)
-    Protocol type: IPv4 (0x0800)
-    Hardware size: 6
-    Protocol size: 4
-    Opcode: request (1)
-    Sender MAC address: ba:71:bd:65:2a:4a (ba:71:bd:65:2a:4a)
-    Sender IP address: 192.168.38.1
-    Target MAC address: 00:00:00_00:00:00 (00:00:00:00:00:00)
-    Target IP address: 192.168.38.2
-
-Frame 3: 42 bytes on wire (336 bits), 42 bytes captured (336 bits) on interface veth0-peer, id 0
-    Section number: 1
-    Interface id: 0 (veth0-peer)
-        Interface name: veth0-peer
-    Encapsulation type: Ethernet (1)
-    Arrival Time: Nov  3, 2025 21:29:51.308207098 CET
-    UTC Arrival Time: Nov  3, 2025 20:29:51.308207098 UTC
-    Epoch Arrival Time: 1762201791.308207098
+    Sender MAC address: c6:31:4c:31:71:04 (c6:31:4c:31:71:04)
+    Sender IP address: 192.168.38.2
+    Target MAC address: Broadcast (ff:ff:ff:ff:ff:ff)
+    Target IP address: 192.168.38.3 
 ```
+
