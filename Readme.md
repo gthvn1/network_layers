@@ -1,3 +1,13 @@
+# Notes
+
+- Ethernet is IEEE standard
+  - Ethernet II Frame format is specifed in IEEE 802.3
+- Part of the Data Link layer (Layer 2)
+- Several RFCs described how to run over Ethernet:
+  - IP over Ethernet: [RFC 894](https://datatracker.ietf.org/doc/html/rfc894)
+  - ARP (Address Resolution Protocol): [RFC 826](https://datatracker.ietf.org/doc/html/rfc826)
+  - IPv6 over Ethernet: [RFC 2464](https://datatracker.ietf.org/doc/html/rfc2464)
+
 # Create virtual cable
 
 We will create a *veth* pair, which acts like a virtual Ethernet cable connecting two interfaces.
