@@ -1,6 +1,7 @@
 const std = @import("std");
 const posix = std.posix;
 const p = @import("params.zig");
+const ethernet = @import("ethernet.zig");
 
 pub fn main() void {
     // Sock create an endpoint for communication
@@ -47,18 +48,17 @@ pub fn main() void {
     };
     std.log.info("Bound to interface {s}", .{p.iface});
 
-    const buf_size: comptime_int = 2048;
-    var buf: [buf_size]u8 = undefined;
+    var frame_buf: [1024]u8 = undefined;
 
     while (true) {
-        const n = posix.read(sock, &buf) catch |err| {
+        const n = posix.read(sock, &frame_buf) catch |err| {
             std.log.err("Failed to read data: {s}", .{@errorName(err)});
             return;
         };
 
         if (n > 0) {
             std.debug.print("--- Received {d} bytes:\n", .{n});
-            for (buf[0..n], 1..) |b, i| {
+            for (frame_buf[0..n], 1..) |b, i| {
                 std.debug.print("{x:0>2} ", .{b});
                 if (@mod(i, 10) == 0) {
                     std.debug.print("\n", .{});
@@ -97,5 +97,15 @@ pub fn main() void {
         //   EtherType: 2 bytes (0x0806 -> ARP)
         //
         // [RFC ARP] https://datatracker.ietf.org/doc/html/rfc826
+
+        var tmp_buf: [17]u8 = undefined;
+        std.log.info(
+            "DestMac: {s}",
+            .{ethernet.macToString(frame_buf[0..6], &tmp_buf)},
+        );
+        std.log.info(
+            "SrcMac : {s}",
+            .{ethernet.macToString(frame_buf[6..12], &tmp_buf)},
+        );
     }
 }
