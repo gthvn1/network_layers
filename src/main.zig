@@ -56,10 +56,6 @@ pub fn main() void {
             return;
         };
 
-        // Ethernet II layout begins with:
-        //   Destination MAC: 6 bytes
-        //   Source MAC: 6 bytes
-        //   EtherType: 2 bytes (0x0806 -> ARP)
         if (n > 0) {
             std.debug.print("--- Received {d} bytes:\n", .{n});
             for (buf[0..n], 1..) |b, i| {
@@ -70,5 +66,36 @@ pub fn main() void {
             }
             std.debug.print("\n--- Done\n", .{});
         }
+
+        if (n != 42) {
+            std.log.warn("We are currently dealing with 42 bytes frame", .{});
+            std.log.warn(" -> 14 bytes header + 28 bytes ARP payload", .{});
+            // TODO: handle more things...
+            continue;
+        }
+
+        // +--------------------------------------------------------+
+        // | Ethernet Header (14 bytes standard)                    |
+        // |--------------------------------------------------------|
+        // | Destination MAC (6) | Source MAC (6) | EtherType (2)   |
+        // +--------------------------------------------------------+
+        // | VLAN Tag (optional, 4 bytes)                           |
+        // |--------------------------------------------------------|
+        // | TPID (2) | TCI (2)                                     |
+        // +--------------------------------------------------------+
+        // | ARP Payload (28 bytes standard for Ethernet/IPv4)      |
+        // |--------------------------------------------------------|
+        // | HTYPE (2) | PTYPE (2) | HLEN (1) | PLEN (1) | OPER (2) |
+        // | SHA (6) | SPA (4) | THA (6) | TPA (4)                  |
+        // +--------------------------------------------------------+
+        // | Frame Check Sequence (FCS, 4 bytes, added by NIC)      |
+        // +--------------------------------------------------------+
+        //
+        // Ethernet II layout begins with:
+        //   Destination MAC: 6 bytes
+        //   Source MAC: 6 bytes
+        //   EtherType: 2 bytes (0x0806 -> ARP)
+        //
+        // [RFC ARP] https://datatracker.ietf.org/doc/html/rfc826
     }
 }
