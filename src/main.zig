@@ -3,7 +3,6 @@ const posix = std.posix;
 const p = @import("params.zig");
 
 pub fn main() void {
-
     // Sock create an endpoint for communication
     // Domain: It is a communication domain, AF.PACKET == Low-level packet interface
     // Socket Type: specifies the communication semantic, SOCK.RAW == raw network protocol access
@@ -19,7 +18,7 @@ pub fn main() void {
     std.log.info("Socket created", .{});
     // Now we need to assign an address to it
 
-    // Packet socket address
+    // Packet socket address: we are testing on Linux
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
     const phys_layer_protocol = std.os.linux.ETH.P.ALL; // Every packet !!!
     const iface_number = std.c.if_nametoindex(p.iface);
@@ -40,7 +39,7 @@ pub fn main() void {
         .addr = addr_copy,
     };
 
-    posix.bind(sock, @ptrCast(&addr), @sizeOf(std.os.linux.sockaddr.ll)) catch |err| {
+    posix.bind(sock, @ptrCast(&addr), @sizeOf(posix.sockaddr.ll)) catch |err| {
         std.log.err("Failed to bound endpoint: {s}", .{@errorName(err)});
         return;
     };
