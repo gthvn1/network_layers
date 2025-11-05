@@ -1,12 +1,8 @@
 const std = @import("std");
 const posix = std.posix;
+const p = @import("params.zig");
 
 pub fn main() void {
-    const iface = "veth0-peer";
-    const mac: []const u8 = &[_]u8{ 0x96, 0x6a, 0x35, 0x42, 0xad, 0x06 };
-    const ip = [_]u8{ 192, 168, 0, 3 };
-
-    _ = ip;
 
     // Sock create an endpoint for communication
     // Domain: It is a communication domain, AF.PACKET == Low-level packet interface
@@ -26,13 +22,13 @@ pub fn main() void {
     // Packet socket address
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
     const phys_layer_protocol = std.os.linux.ETH.P.ALL; // Every packet !!!
-    const iface_number = std.c.if_nametoindex(iface);
+    const iface_number = std.c.if_nametoindex(p.iface);
     const arp_hw_type = 0;
     const packet_type = std.os.linux.PACKET.BROADCAST;
-    const size_of_addr = mac.len;
+    const size_of_addr = p.mac.len;
 
     var addr_copy = [_]u8{0} ** 8;
-    std.mem.copyForwards(u8, addr_copy[0..mac.len], mac);
+    std.mem.copyForwards(u8, addr_copy[0..p.mac.len], p.mac);
 
     const addr: posix.sockaddr.ll = .{
         .family = family,
@@ -48,7 +44,7 @@ pub fn main() void {
         std.log.err("Failed to bound endpoint: {s}", .{@errorName(err)});
         return;
     };
-    std.log.info("Bound to interface {s}", .{iface});
+    std.log.info("Bound to interface {s}", .{p.iface});
 
     const buf_size: comptime_int = 2048;
     var buf: [buf_size]u8 = undefined;
