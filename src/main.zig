@@ -20,7 +20,7 @@ pub fn main() void {
 
     // Packet socket address: we are testing on Linux
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
-    const phys_layer_protocol = std.os.linux.ETH.P.ALL; // Every packet !!!
+    const phys_layer_protocol = std.mem.nativeToBig(u16, std.os.linux.ETH.P.ALL); // Every packet !!!
     const iface_number = std.c.if_nametoindex(p.iface);
     const arp_hw_type = 0;
     const packet_type = std.os.linux.PACKET.BROADCAST;
@@ -39,6 +39,8 @@ pub fn main() void {
         .addr = addr_copy,
     };
 
+    std.log.info("Interface index: {}", .{iface_number});
+
     posix.bind(sock, @ptrCast(&addr), @sizeOf(posix.sockaddr.ll)) catch |err| {
         std.log.err("Failed to bound endpoint: {s}", .{@errorName(err)});
         return;
@@ -54,12 +56,19 @@ pub fn main() void {
             return;
         };
 
+        // Ethernet II layout begins with:
+        //   Destination MAC: 6 bytes
+        //   Source MAC: 6 bytes
+        //   EtherType: 2 bytes (0x0806 -> ARP)
         if (n > 0) {
-            std.debug.print("Received {d} bytes: ", .{n});
-            for (buf[0..n]) |b| {
-                std.debug.print("{x:0>4} ", .{b});
+            std.debug.print("--- Received {d} bytes:\n", .{n});
+            for (buf[0..n], 1..) |b, i| {
+                std.debug.print("{x:0>2} ", .{b});
+                if (@mod(i, 10) == 0) {
+                    std.debug.print("\n", .{});
+                }
             }
-            std.debug.print("\n", .{});
+            std.debug.print("\n--- Done\n", .{});
         }
     }
 }
