@@ -3,7 +3,7 @@ const posix = std.posix;
 const p = @import("params.zig");
 const ethernet = @import("ethernet.zig");
 
-pub fn main() void {
+pub fn main() !void {
     // Sock create an endpoint for communication
     // Domain: It is a communication domain, AF.PACKET == Low-level packet interface
     // Socket Type: specifies the communication semantic, SOCK.RAW == raw network protocol access
@@ -21,14 +21,14 @@ pub fn main() void {
 
     // Packet socket address: we are testing on Linux
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
+    var mac = [_]u8{0} ** 8;
+    try ethernet.stringToMac(p.mac, mac[0..6]);
+
     const phys_layer_protocol = std.mem.nativeToBig(u16, std.os.linux.ETH.P.ALL); // Every packet !!!
     const iface_number = std.c.if_nametoindex(p.iface);
     const arp_hw_type = 0;
     const packet_type = std.os.linux.PACKET.BROADCAST;
-    const size_of_addr = p.mac.len;
-
-    var addr_copy = [_]u8{0} ** 8;
-    std.mem.copyForwards(u8, addr_copy[0..p.mac.len], p.mac);
+    const size_of_addr = mac.len;
 
     const addr: posix.sockaddr.ll = .{
         .family = family,
@@ -37,7 +37,7 @@ pub fn main() void {
         .hatype = arp_hw_type,
         .pkttype = packet_type,
         .halen = size_of_addr,
-        .addr = addr_copy,
+        .addr = mac,
     };
 
     std.log.info("Interface index: {}", .{iface_number});
