@@ -12,7 +12,29 @@ pub fn main() !void {
     var args_it = try std.process.argsWithAllocator(allocator);
     defer args_it.deinit();
 
-    const params = try p.Args.parse(&args_it);
+    const params = p.Args.parse(&args_it) catch |err| switch (err) {
+        p.ArgsError.Help => return,
+        p.ArgsError.IfaceMissing => {
+            std.log.err("Interface is missing", .{});
+            return;
+        },
+        p.ArgsError.IfaceArgMissing => {
+            std.log.err("Interface requires an argument", .{});
+            return;
+        },
+        p.ArgsError.MacMissing => {
+            std.log.err("MAC address is missing", .{});
+            return;
+        },
+        p.ArgsError.MacArgMissing => {
+            std.log.err("MAC address requires an argument", .{});
+            return;
+        },
+        p.ArgsError.NoArgs => {
+            std.log.err("Interface and MAC address are missing", .{});
+            return;
+        },
+    };
 
     std.log.info("iface: {s}", .{params.iface});
     std.log.info("mac  : {s}", .{params.mac});

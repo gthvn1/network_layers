@@ -1,22 +1,23 @@
 const std = @import("std");
 
-const Opt = enum { iface, mac };
+const Opt = enum { help, iface, mac };
 
 pub fn getArg(str: []const u8) ?Opt {
     const args_map = std.StaticStringMap(Opt).initComptime(.{
+        .{ "--help", .help },
         .{ "--iface", .iface },
         .{ "--mac", .mac },
     });
     return args_map.get(str);
 }
 
-pub const ArgsError = error{ IfaceMissing, IfaceArgMissing, MacMissing, MacArgMissing, NoArgs };
+pub const ArgsError = error{ IfaceMissing, IfaceArgMissing, MacMissing, MacArgMissing, NoArgs, Help };
 
 pub const Args = struct {
     iface: [:0]const u8,
     mac: [:0]const u8,
 
-    pub fn parse(it: *std.process.ArgIterator) !Args {
+    pub fn parse(it: *std.process.ArgIterator) ArgsError!Args {
         // First argument is the program name
         const progname = it.next() orelse unreachable;
 
@@ -28,6 +29,10 @@ pub const Args = struct {
                 usage(progname);
                 return ArgsError.NoArgs;
             }) {
+                .help => {
+                    usage(progname);
+                    return ArgsError.Help;
+                },
                 .iface => iface_opt = it.next() orelse {
                     usage(progname);
                     return ArgsError.IfaceArgMissing;
