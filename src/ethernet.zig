@@ -15,7 +15,8 @@ pub fn macToString(mac: []const u8, buf: *[17]u8) []const u8 {
 }
 
 const MacError = error{
-    Invalid,
+    TooManyBytes,
+    TooFewBytes,
 };
 
 pub fn stringToMac(mac_str: []const u8, mac_buf: *[6]u8) !void {
@@ -23,15 +24,14 @@ pub fn stringToMac(mac_str: []const u8, mac_buf: *[6]u8) !void {
     var idx: usize = 0;
 
     while (it.next()) |str| {
-        if (idx >= 6) {
-            return MacError.Invalid;
-        }
+        if (idx >= 6) return MacError.TooManyBytes;
 
         const v = try std.fmt.parseInt(u8, str, 16);
         mac_buf[idx] = v;
-
         idx += 1;
     }
+
+    if (idx != 6) return MacError.TooFewBytes;
 }
 
 test "macToString_failed" {
@@ -49,6 +49,7 @@ test "macToString_succeded" {
     try std.testing.expectEqualStrings(resp, "01:02:03:04:05:06");
 }
 
+// TODO: test cases that failed
 test "stringToMac_succeded" {
     var mac: [6]u8 = undefined;
     const mac_str = "01:02:03:04:05:A6";
