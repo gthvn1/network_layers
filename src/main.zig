@@ -1,9 +1,23 @@
 const std = @import("std");
 const posix = std.posix;
-const p = @import("params.zig");
 const ethernet = @import("ethernet.zig");
 
 pub fn main() !void {
+    const iface = "veth0-peer";
+
+    // We are expecting a mac address as parameter
+    // TODO: read iface and mac as parameter
+    var mac = [_]u8{0} ** 8;
+
+    var args_it = std.process.args();
+    // The first argument is the program name
+    _ = args_it.next();
+    const mac_str = args_it.next() orelse {
+        std.log.err("MAC address is expected as first argument", .{});
+        return;
+    };
+    try ethernet.stringToMac(mac_str, mac[0..6]);
+
     // Sock create an endpoint for communication
     // Domain: It is a communication domain, AF.PACKET == Low-level packet interface
     // Socket Type: specifies the communication semantic, SOCK.RAW == raw network protocol access
@@ -21,11 +35,9 @@ pub fn main() !void {
 
     // Packet socket address: we are testing on Linux
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
-    var mac = [_]u8{0} ** 8;
-    try ethernet.stringToMac(p.mac, mac[0..6]);
 
     const phys_layer_protocol = std.mem.nativeToBig(u16, std.os.linux.ETH.P.ALL); // Every packet !!!
-    const iface_number = std.c.if_nametoindex(p.iface);
+    const iface_number = std.c.if_nametoindex(iface);
     const arp_hw_type = 0;
     const packet_type = std.os.linux.PACKET.BROADCAST;
     const size_of_addr = mac.len;
@@ -46,7 +58,7 @@ pub fn main() !void {
         std.log.err("Failed to bound endpoint: {s}", .{@errorName(err)});
         return;
     };
-    std.log.info("Bound to interface {s}", .{p.iface});
+    std.log.info("Bound to interface {s}", .{iface});
 
     var frame_buf: [1024]u8 = undefined;
 
