@@ -2,20 +2,91 @@ const std = @import("std");
 const posix = std.posix;
 const ethernet = @import("ethernet.zig");
 
+const Argument = enum {
+    iface,
+    mac,
+
+    pub fn getArg(str: []const u8) ?Argument {
+        const args_map = std.StaticStringMap(Argument).initComptime(.{
+            .{ "--iface", .iface },
+            .{ "--mac", .mac },
+        });
+        return args_map.get(str);
+    }
+};
+
 pub fn main() !void {
-    const iface = "veth0-peer";
+    const GpaType = std.heap.GeneralPurposeAllocator(.{});
+    var gpa = GpaType{};
+    const allocator = gpa.allocator();
+    defer std.debug.assert(gpa.deinit() == .ok);
+
+    var iface: ?[]const u8 = null;
+    var mac_str: ?[]const u8 = null;
+    const stop: ?[]const u8 = null;
+
+    var args_it = try std.process.argsWithAllocator(allocator);
+    defer args_it.deinit();
+
+    // First argument is the program name
+    const progname = args_it.next() orelse unreachable;
+    while (args_it.next()) |arg| {
+        if (Argument.getArg(arg)) |a| switch (a) {
+            .iface => {
+                if (args_it.next()) |s| {
+                    iface = s;
+                } else {
+                    std.debug.print(
+                        "USAGE: {s} --iface <interface> --mac <mac address>\n",
+                        .{progname},
+                    );
+                    return;
+                }
+            },
+            .mac => {
+                if (args_it.next()) |s| {
+                    mac_str = s;
+                } else {
+                    std.debug.print(
+                        "USAGE: {s} --iface <interface> --mac <mac address>\n",
+                        .{progname},
+                    );
+                    return;
+                }
+            },
+        } else {
+            std.debug.print(
+                "USAGE: {s} --iface <interface> --mac <mac address>\n",
+                .{progname},
+            );
+            return;
+        }
+    }
+
+    if (iface) |i| {
+        std.debug.print("iface = {s}\n", .{i});
+    }
+
+    if (mac_str) |m| {
+        std.debug.print("mac = {s}\n", .{m});
+    }
+
+    if (iface == null or mac_str == null) {
+        std.debug.print(
+            "USAGE: {s} --iface <interface> --mac <mac address>\n",
+            .{progname},
+        );
+        return;
+    }
+
+    if (stop == null) {
+        std.debug.print("Once arguments is well parsed we can remove the stop!!!\n", .{});
+        return;
+    }
 
     // We are expecting a mac address as parameter
     // TODO: read iface and mac as parameter
     var mac = [_]u8{0} ** 8;
-
-    var args_it = std.process.args();
-    // The first argument is the program name
-    _ = args_it.next();
-    const mac_str = args_it.next() orelse {
-        std.log.err("MAC address is expected as first argument", .{});
-        return;
-    };
     try ethernet.stringToMac(mac_str, mac[0..6]);
 
     // Sock create an endpoint for communication
