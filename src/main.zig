@@ -26,7 +26,6 @@ pub fn main() !void {
     std.log.info("params: iface: {s}", .{params.iface});
 
     // --------------------------- SETUP ---------------------------------------
-    // Create a peer for our test
     var mac_buf: [17]u8 = undefined;
     const vp: s.VirtPair = try s.getOrCreateVeth(allocator, params.iface);
     std.log.info("found mac: {s}", .{e.macToString(&vp.mac, &mac_buf)});
@@ -138,13 +137,7 @@ pub fn main() !void {
         // [RFC ARP] https://datatracker.ietf.org/doc/html/rfc826
 
         var tmp_buf: [17]u8 = undefined;
-        std.log.info(
-            "DestMac: {s}",
-            .{e.macToString(frame_buf[0..6], &tmp_buf)},
-        );
-        std.log.info(
-            "SrcMac : {s}",
-            .{e.macToString(frame_buf[6..12], &tmp_buf)},
-        );
+        std.log.info("DestMac: {s}", .{e.macToString(frame_buf[0..6], &tmp_buf)});
+        std.log.info("SrcMac : {s}", .{e.macToString(frame_buf[6..12], &tmp_buf)});
     }
 }
