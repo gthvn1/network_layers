@@ -6,6 +6,7 @@ const Interface = struct {
     flags: []const []const u8,
     mtu: i32,
     qdisc: []const u8,
+    master: ?[]const u8 = null,
     operstate: []const u8,
     linkmode: []const u8,
     group: []const u8,
