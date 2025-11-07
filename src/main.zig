@@ -18,19 +18,15 @@ pub fn main() !void {
             p.ArgsError.Help => {},
             p.ArgsError.IfaceMissing => std.log.err("Interface is missing", .{}),
             p.ArgsError.IfaceArgMissing => std.log.err("Interface requires an argument", .{}),
-            p.ArgsError.MacMissing => std.log.err("MAC address is missing", .{}),
-            p.ArgsError.MacArgMissing => std.log.err("MAC address requires an argument", .{}),
             p.ArgsError.NoParams => std.log.err("Interface and MAC address are missing", .{}),
         }
         return;
     };
 
     std.log.info("iface: {s}", .{params.iface});
-    std.log.info("mac  : {s}", .{params.mac});
 
     // Create a peer for our test
     var mac_buf: [17]u8 = undefined;
-
     const vp: s.VirtPair = try s.getOrCreateVeth(allocator, params.iface);
     std.log.info("found mac: {s}", .{e.macToString(&vp.mac, &mac_buf)});
     std.log.info("found mac peer: {s}", .{e.macToString(&vp.mac_peer, &mac_buf)});
@@ -53,13 +49,15 @@ pub fn main() !void {
     // Packet socket address: we are testing on Linux
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
 
-    var mac = [_]u8{0} ** 8;
-    try e.stringToMac(params.mac, mac[0..6]);
     const phys_layer_protocol = std.mem.nativeToBig(u16, std.os.linux.ETH.P.ALL); // Every packet !!!
     const iface_number = std.c.if_nametoindex(params.iface);
     const arp_hw_type = 0;
     const packet_type = std.os.linux.PACKET.BROADCAST;
-    const size_of_addr = mac.len;
+    const size_of_addr = vp.mac.len;
+
+    // for sockaddr.ll addr is [8]u8
+    var mac = [_]u8{0} ** 8;
+    std.mem.copyForwards(u8, &mac, &vp.mac);
 
     const addr: posix.sockaddr.ll = .{
         .family = family,
