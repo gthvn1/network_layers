@@ -11,7 +11,7 @@ pub fn getArg(str: []const u8) ?Opt {
     return args_map.get(str);
 }
 
-pub const ArgsError = error{ IfaceMissing, IfaceArgMissing, MacMissing, MacArgMissing, NoArgs, Help };
+pub const ArgsError = error{ IfaceMissing, IfaceArgMissing, MacMissing, MacArgMissing, NoParams, Help };
 
 pub const Args = struct {
     iface: [:0]const u8,
@@ -27,7 +27,7 @@ pub const Args = struct {
         while (it.next()) |arg| {
             switch (getArg(arg) orelse {
                 usage(progname);
-                return ArgsError.NoArgs;
+                return ArgsError.NoParams;
             }) {
                 .help => {
                     usage(progname);
@@ -42,6 +42,11 @@ pub const Args = struct {
                     return ArgsError.MacArgMissing;
                 },
             }
+        }
+
+        if (iface_opt == null and mac_opt == null) {
+            usage(progname);
+            return ArgsError.NoParams;
         }
 
         if (iface_opt == null) {
