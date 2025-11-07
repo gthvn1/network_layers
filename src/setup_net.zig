@@ -45,7 +45,8 @@ pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair
     };
 
     // First check if it exists
-    if (try getDeviceMac(allocator, name, &vp.mac)) {
+    const found = try getDeviceMac(allocator, name, &vp.mac);
+    if (found) {
         // If we found interface "name" we are expecting to find its peer
         if (try getDeviceMac(allocator, peer_name, &vp.mac_peer)) {
             return vp;
@@ -53,33 +54,22 @@ pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair
         return error.PeerNotFound;
     }
 
-    // We need to create virtual pair first
-    const cmd = [_][]const u8{
-        "ip",
-        "link",
-        "add",
-        name,
-        "type",
-        "veth",
-        "peer",
-        "name",
-        peer_name,
-    };
+    // We need to create virtual pair
+    const cmd = [_][]const u8{ "ip", "link", "add", name, "type", "veth", "peer", "name", peer_name };
 
     var res = try runCmd(allocator, &cmd);
     defer res.deinit();
 
-    if (res.stderr.len != 0) {
-        std.log.err("{s}", .{res.stderr});
+    if (res.stderr.len > 0) {
+        std.log.err("ip link add failed: {s}", .{res.stderr});
     }
 
     // Now we can get the MAC
     if (try getDeviceMac(allocator, name, &vp.mac)) {
-        // If we found interface "name" we are expecting to find its peer
         if (try getDeviceMac(allocator, peer_name, &vp.mac_peer)) {
             return vp;
         }
-        return error.PeerNotFoundAndNotExpected;
+        return error.PeerMissingAfterCreation;
     }
 
     return error.VethMacFailed;
@@ -113,7 +103,7 @@ fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) !bo
 fn runCmd(allocator: std.mem.Allocator, command: []const []const u8) !CmdOutput {
     const Child = std.process.Child;
 
-    // Child inherir stdout & stderr
+    // Child inherits stdout & stderr so redirect them.
     var child = Child.init(command, allocator);
     child.stdout_behavior = .Pipe;
     child.stderr_behavior = .Pipe;
