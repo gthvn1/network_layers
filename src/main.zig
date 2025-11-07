@@ -13,7 +13,7 @@ pub fn main() !void {
     var args_it = try std.process.argsWithAllocator(allocator);
     defer args_it.deinit();
 
-    try s.check_veth(allocator);
+    try s.checkVeth(allocator);
 
     const params = p.Args.parse(&args_it) catch |err| {
         switch (err) {
