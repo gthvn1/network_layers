@@ -141,3 +141,53 @@ pub fn main() !void {
         std.log.info("SrcMac : {s}", .{e.macToString(frame_buf[6..12], &tmp_buf)});
     }
 }
+
+// TODO: check code for handling arp and ip and use it...
+fn handleArp(sock: posix.fd_t, frame: []u8, n: usize, my_mac: []const u8, my_ip: []const u8) void {
+    if (n < 42) return;
+
+    const op = std.mem.readIntBig(u16, frame[20..22]);
+    const target_ip = frame[38..42];
+
+    if (op == 1 and std.mem.eql(u8, target_ip, my_ip)) {
+        var reply = frame[0..42].*; // copy base
+        // Swap MACs
+        std.mem.copy(u8, reply[0..6], frame[6..12]); // dst
+        std.mem.copy(u8, reply[6..12], my_mac); // src
+        // Ethernet type stays 0x0806
+        std.mem.writeIntBig(u16, reply[20..22], 2); // ARP reply
+        std.mem.copy(u8, reply[22..28], my_mac); // sender MAC
+        std.mem.copy(u8, reply[28..32], my_ip); // sender IP
+        std.mem.copy(u8, reply[32..38], frame[22..28]); // target MAC
+        std.mem.copy(u8, reply[38..42], frame[28..32]); // target IP
+
+        _ = posix.write(sock, &reply);
+        std.debug.print("Replied to ARP from {X:0>2}:{X:0>2}:{X:0>2}:{X:0>2}:{X:0>2}:{X:0>2}\n", .{ frame[6], frame[7], frame[8], frame[9], frame[10], frame[11] });
+    }
+}
+
+fn handleIp(sock: posix.fd_t, frame: []u8, n: usize, my_mac: []const u8, my_ip: []const u8) void {
+    if (n < 42) return;
+    const proto = frame[23];
+    const dst_ip = frame[30..34];
+    if (!std.mem.eql(u8, dst_ip, my_ip)) return;
+
+    if (proto == 1) { // ICMP
+        const icmp_type = frame[34];
+        if (icmp_type == 8) { // echo request
+            var reply = frame[0..n].*;
+            // swap MACs
+            std.mem.copy(u8, reply[0..6], frame[6..12]);
+            std.mem.copy(u8, reply[6..12], my_mac);
+            // swap IPs
+            std.mem.copy(u8, reply[26..30], frame[30..34]);
+            std.mem.copy(u8, reply[30..34], frame[26..30]);
+            reply[34] = 0; // type = echo reply
+            // recalc checksum (quick fix)
+            reply[36] = 0;
+            reply[37] = 0;
+            _ = posix.write(sock, &reply);
+            std.debug.print("Replied to ICMP echo from {d}.{d}.{d}.{d}\n", .{ frame[26], frame[27], frame[28], frame[29] });
+        }
+    }
+}
