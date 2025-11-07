@@ -4,6 +4,34 @@ const posix = std.posix;
 const e = @import("ethernet.zig");
 const p = @import("params.zig");
 
+fn check_veth(allocator: std.mem.Allocator) !void {
+    const Child = std.process.Child;
+    const argv = [_][]const u8{
+        "ip",
+        "link",
+    };
+
+    // Child inherir stdout & stderr
+    var child = Child.init(&argv, allocator);
+    child.stdout_behavior = .Pipe;
+    child.stderr_behavior = .Pipe;
+
+    var stdout: std.array_list.Aligned(u8, null) = .empty;
+    defer stdout.deinit(allocator);
+    var stderr: std.array_list.Aligned(u8, null) = .empty;
+    defer stderr.deinit(allocator);
+
+    try child.spawn();
+    try child.collectOutput(allocator, &stdout, &stderr, 1024);
+    const term = try child.wait();
+
+    try std.testing.expectEqual(term.Exited, 0);
+
+    // convert to strings
+    std.log.debug("stdout: {s}", .{stdout.items});
+    std.log.err("stderr: {s}", .{stderr.items});
+}
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
@@ -11,6 +39,8 @@ pub fn main() !void {
 
     var args_it = try std.process.argsWithAllocator(allocator);
     defer args_it.deinit();
+
+    try check_veth(allocator);
 
     const params = p.Args.parse(&args_it) catch |err| {
         switch (err) {
