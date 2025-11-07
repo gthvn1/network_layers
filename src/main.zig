@@ -13,8 +13,6 @@ pub fn main() !void {
     var args_it = try std.process.argsWithAllocator(allocator);
     defer args_it.deinit();
 
-    try s.checkVeth(allocator);
-
     const params = p.Args.parse(&args_it) catch |err| {
         switch (err) {
             p.ArgsError.Help => {},
@@ -29,6 +27,15 @@ pub fn main() !void {
 
     std.log.info("iface: {s}", .{params.iface});
     std.log.info("mac  : {s}", .{params.mac});
+
+    // For debug purposes check that lo interface is there
+    if (try s.checkVeth(allocator, "lo")) {
+        std.log.debug("lo interface found", .{});
+    } else {
+        std.log.err("lo interface not found", .{});
+    }
+    // Create a peer for our test
+    try s.createVeth(allocator, params.iface);
 
     // Sock create an endpoint for communication
     // Domain: It is a communication domain, AF.PACKET == Low-level packet interface

@@ -28,8 +28,33 @@ const CmdOutput = struct {
     }
 };
 
-// TODO: currently we are only printing interfaces found
-pub fn checkVeth(allocator: std.mem.Allocator) !void {
+pub fn createVeth(allocator: std.mem.Allocator, name: []const u8) !void {
+    if (try checkVeth(allocator, name)) return;
+
+    const peer_name = try std.fmt.allocPrint(allocator, "{s}-peer", .{name});
+    defer allocator.free(peer_name);
+
+    const cmd = [_][]const u8{
+        "ip",
+        "link",
+        "add",
+        name,
+        "type",
+        "veth",
+        "peer",
+        "name",
+        peer_name,
+    };
+
+    var res = try runCmd(allocator, &cmd);
+    defer res.deinit();
+
+    if (res.stderr.len != 0) {
+        std.log.err("{s}", .{res.stderr});
+    }
+}
+
+pub fn checkVeth(allocator: std.mem.Allocator, name: []const u8) !bool {
     const cmd = [_][]const u8{ "ip", "-j", "link" };
     var res = try runCmd(allocator, &cmd);
     defer res.deinit();
@@ -38,8 +63,12 @@ pub fn checkVeth(allocator: std.mem.Allocator) !void {
     defer interfaces.deinit();
 
     for (interfaces.value) |iface| {
-        std.log.debug("iface:{s}", .{iface.ifname});
+        if (std.mem.eql(u8, name, iface.ifname)) {
+            return true;
+        }
     }
+
+    return false;
 }
 
 fn runCmd(allocator: std.mem.Allocator, command: []const []const u8) !CmdOutput {
