@@ -23,14 +23,24 @@ pub fn main() !void {
         return;
     };
 
-    std.log.info("iface: {s}", .{params.iface});
+    std.log.info("params: iface: {s}", .{params.iface});
 
+    // --------------------------- SETUP ---------------------------------------
     // Create a peer for our test
     var mac_buf: [17]u8 = undefined;
     const vp: s.VirtPair = try s.getOrCreateVeth(allocator, params.iface);
     std.log.info("found mac: {s}", .{e.macToString(&vp.mac, &mac_buf)});
     std.log.info("found mac peer: {s}", .{e.macToString(&vp.mac_peer, &mac_buf)});
 
+    try s.setIp(allocator, params.iface, "192.168.38.2/24");
+    try s.linkUp(allocator, params.iface);
+    defer {
+        s.cleanup(allocator, params.iface) catch {
+            std.log.err("failed to cleanup interface {s}", .{params.iface});
+        };
+    }
+
+    // ------------------------------------------------------------------------
     // Sock create an endpoint for communication
     // Domain: It is a communication domain, AF.PACKET == Low-level packet interface
     // Socket Type: specifies the communication semantic, SOCK.RAW == raw network protocol access

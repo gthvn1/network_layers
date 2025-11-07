@@ -35,6 +35,51 @@ pub const VirtPair = struct {
     mac_peer: [6]u8,
 };
 
+pub fn linkUp(allocator: std.mem.Allocator, name: []const u8) !void {
+    const peer_name = try std.fmt.allocPrint(allocator, "{s}-peer", .{name});
+    defer allocator.free(peer_name);
+
+    const cmd1 = [_][]const u8{ "ip", "link", "set", name, "up" };
+
+    var res1 = try runCmd(allocator, &cmd1);
+    defer res1.deinit();
+
+    if (res1.stderr.len > 0) {
+        std.log.err("ip link up failed: {s}", .{res1.stderr});
+        return error.IpLinkUpFailed;
+    }
+
+    std.log.info("ip link set {s} up", .{name});
+    const cmd2 = [_][]const u8{ "ip", "link", "set", peer_name, "up" };
+
+    var res2 = try runCmd(allocator, &cmd2);
+    defer res2.deinit();
+
+    if (res2.stderr.len > 0) {
+        std.log.err("ip link up failed: {s}", .{res2.stderr});
+        return error.IpLinkUpFailed;
+    }
+
+    std.log.info("ip link set {s} up", .{peer_name});
+}
+
+// TODO: we probably want to keep the name of the peer somewhere instead
+// of reallocating every time.
+pub fn setIp(allocator: std.mem.Allocator, name: []const u8, ip: []const u8) !void {
+    // TODO: check that IP is XX.XX.XX.XX/YY
+    const cmd = [_][]const u8{ "ip", "addr", "add", ip, "dev", name };
+
+    var res = try runCmd(allocator, &cmd);
+    defer res.deinit();
+
+    if (res.stderr.len > 0) {
+        std.log.err("ip addr add failed: {s}", .{res.stderr});
+        return error.IpAddrAddFailed;
+    }
+
+    std.log.info("ip addr add {s} dev {s}", .{ ip, name });
+}
+
 pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair {
     const peer_name = try std.fmt.allocPrint(allocator, "{s}-peer", .{name});
     defer allocator.free(peer_name);
@@ -45,7 +90,7 @@ pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair
     };
 
     // First check if it exists
-    const found = try getDeviceMac(allocator, name, &vp.mac);
+    const found = getDeviceMac(allocator, name, &vp.mac) catch false;
     if (found) {
         // If we found interface "name" we are expecting to find its peer
         if (try getDeviceMac(allocator, peer_name, &vp.mac_peer)) {
@@ -62,7 +107,10 @@ pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair
 
     if (res.stderr.len > 0) {
         std.log.err("ip link add failed: {s}", .{res.stderr});
+        return error.IpLinkAddFailed;
     }
+
+    std.log.info("ip link add {s} type veth peer name {s}", .{ name, peer_name });
 
     // Now we can get the MAC
     if (try getDeviceMac(allocator, name, &vp.mac)) {
@@ -73,6 +121,21 @@ pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair
     }
 
     return error.VethMacFailed;
+}
+
+// Peer is automatically removed by kernel
+pub fn cleanup(allocator: std.mem.Allocator, name: []const u8) !void {
+    const cmd = [_][]const u8{ "ip", "link", "del", name };
+
+    var res = try runCmd(allocator, &cmd);
+    defer res.deinit();
+
+    if (res.stderr.len > 0) {
+        std.log.err("ip link del failed: {s}", .{res.stderr});
+        return error.IpLinkDelFailed;
+    }
+
+    std.log.info("ip link del {s}", .{name});
 }
 
 fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) !bool {
