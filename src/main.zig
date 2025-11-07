@@ -28,14 +28,12 @@ pub fn main() !void {
     std.log.info("iface: {s}", .{params.iface});
     std.log.info("mac  : {s}", .{params.mac});
 
-    // For debug purposes check that lo interface is there
-    if (try s.checkVeth(allocator, "lo")) {
-        std.log.debug("lo interface found", .{});
-    } else {
-        std.log.err("lo interface not found", .{});
-    }
     // Create a peer for our test
-    try s.createVeth(allocator, params.iface);
+    var mac_buf: [17]u8 = undefined;
+
+    const vp: s.VirtPair = try s.getOrCreateVeth(allocator, params.iface);
+    std.log.info("found mac: {s}", .{e.macToString(&vp.mac, &mac_buf)});
+    std.log.info("found mac peer: {s}", .{e.macToString(&vp.mac_peer, &mac_buf)});
 
     // Sock create an endpoint for communication
     // Domain: It is a communication domain, AF.PACKET == Low-level packet interface

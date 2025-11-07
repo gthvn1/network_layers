@@ -1,4 +1,5 @@
 const std = @import("std");
+const ethernet = @import("ethernet.zig");
 
 const Interface = struct {
     ifindex: i32,
@@ -29,12 +30,30 @@ const CmdOutput = struct {
     }
 };
 
-pub fn createVeth(allocator: std.mem.Allocator, name: []const u8) !void {
-    if (try checkVeth(allocator, name)) return;
+pub const VirtPair = struct {
+    mac: [6]u8,
+    mac_peer: [6]u8,
+};
 
+pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair {
     const peer_name = try std.fmt.allocPrint(allocator, "{s}-peer", .{name});
     defer allocator.free(peer_name);
 
+    var vp = VirtPair{
+        .mac = [_]u8{0} ** 6,
+        .mac_peer = [_]u8{0} ** 6,
+    };
+
+    // First check if it exists
+    if (try getDeviceMac(allocator, name, &vp.mac)) {
+        // If we found interface "name" we are expecting to find its peer
+        if (try getDeviceMac(allocator, peer_name, &vp.mac_peer)) {
+            return vp;
+        }
+        return error.PeerNotFound;
+    }
+
+    // We need to create virtual pair first
     const cmd = [_][]const u8{
         "ip",
         "link",
@@ -53,18 +72,37 @@ pub fn createVeth(allocator: std.mem.Allocator, name: []const u8) !void {
     if (res.stderr.len != 0) {
         std.log.err("{s}", .{res.stderr});
     }
+
+    // Now we can get the MAC
+    if (try getDeviceMac(allocator, name, &vp.mac)) {
+        // If we found interface "name" we are expecting to find its peer
+        if (try getDeviceMac(allocator, peer_name, &vp.mac_peer)) {
+            return vp;
+        }
+        return error.PeerNotFoundAndNotExpected;
+    }
+
+    return error.VethMacFailed;
 }
 
-pub fn checkVeth(allocator: std.mem.Allocator, name: []const u8) !bool {
-    const cmd = [_][]const u8{ "ip", "-j", "link" };
+fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) !bool {
+    const cmd = [_][]const u8{ "ip", "-j", "link", "show", name };
     var res = try runCmd(allocator, &cmd);
     defer res.deinit();
 
     const interfaces = try std.json.parseFromSlice([]Interface, allocator, res.stdout, .{});
     defer interfaces.deinit();
 
-    for (interfaces.value) |iface| {
-        if (std.mem.eql(u8, name, iface.ifname)) {
+    if (interfaces.value.len == 0) return false;
+    if (interfaces.value.len > 1) {
+        std.log.err("we found {d} devices for {s}", .{ interfaces.value.len, name });
+        return false;
+    }
+
+    const iface = interfaces.value[0];
+    if (std.mem.eql(u8, name, iface.ifname)) {
+        if (iface.address) |addr| {
+            try ethernet.stringToMac(addr, buf);
             return true;
         }
     }
