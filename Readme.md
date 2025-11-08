@@ -9,7 +9,7 @@
   - IPv6 over Ethernet: [RFC 2464](https://datatracker.ietf.org/doc/html/rfc2464)
 - To build and run:
 ```
-zig build && ./zig-out/bin/netl2 --iface veth0-peer --mac 9a:1b:1e:55:f0:95
+zig build && ./zig-out/bin/netl2 --iface veth0
 ```
   - You need to be root or set capabilite. See `cap_net_raw+ep` below.
 
