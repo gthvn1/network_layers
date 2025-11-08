@@ -1,10 +1,18 @@
 const std = @import("std");
+const os = std.os;
 const posix = std.posix;
 
 const a = @import("arp.zig");
 const e = @import("ethernet.zig");
 const p = @import("params.zig");
 const s = @import("setup_net.zig");
+
+var should_quit = std.atomic.Value(bool).init(false);
+
+fn handleSigint(sig: c_int) callconv(.c) void {
+    _ = sig;
+    should_quit.store(true, .release);
+}
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -61,10 +69,10 @@ pub fn main() !void {
     // Packet socket address: we are testing on Linux
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
 
-    const phys_layer_protocol = std.mem.nativeToBig(u16, std.os.linux.ETH.P.ALL); // Every packet !!!
+    const phys_layer_protocol = std.mem.nativeToBig(u16, os.linux.ETH.P.ALL); // Every packet !!!
     const iface_number = std.c.if_nametoindex(params.iface);
     const arp_hw_type = 0;
-    const packet_type = std.os.linux.PACKET.BROADCAST;
+    const packet_type = os.linux.PACKET.BROADCAST;
     const size_of_addr = vp.mac.len;
 
     // for sockaddr.ll addr is [8]u8
@@ -91,7 +99,20 @@ pub fn main() !void {
 
     var frame_buf: [1024]u8 = undefined;
 
-    loop: while (true) {
+    // Set up signal handler for SIGINT (Ctrl-C)
+    const signal_action = posix.Sigaction{
+        .handler = .{ .handler = handleSigint },
+        .mask = posix.sigemptyset(),
+        .flags = 0,
+    };
+    // Change the signal action
+    posix.sigaction(posix.SIG.INT, &signal_action, null);
+
+    std.debug.print("Listening on socket... Press Ctrl-C to stop\n", .{});
+
+    // ------------------------------------------------------------------------
+    // Main loop
+    loop: while (!should_quit.load(.acquire)) {
         const n = posix.read(sock, &frame_buf) catch |err| {
             std.log.err("Failed to read data: {s}", .{@errorName(err)});
             return;
@@ -129,6 +150,8 @@ pub fn main() !void {
             .unknown => std.log.warn("Unkown ethertype", .{}),
         }
     }
+
+    std.debug.print("Cleaning in progress...\n", .{});
 }
 
 fn handleIp(sock: posix.fd_t, frame: []u8, n: usize, my_mac: []const u8, my_ip: []const u8) void {
