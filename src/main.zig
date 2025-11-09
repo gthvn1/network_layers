@@ -2,10 +2,12 @@ const std = @import("std");
 const os = std.os;
 const posix = std.posix;
 
-const a = @import("arp.zig");
-const e = @import("ethernet.zig");
 const p = @import("params.zig");
-const s = @import("setup_net.zig");
+
+const network = @import("network.zig");
+const a = network.arp;
+const e = network.ethernet;
+const s = network.setup;
 
 var should_quit = std.atomic.Value(bool).init(false);
 
