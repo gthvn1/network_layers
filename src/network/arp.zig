@@ -57,7 +57,7 @@ pub const ArpPacket = struct {
     const ARPSIZE: comptime_int = 28;
 
     pub fn parse(buf: []const u8) !ArpPacket {
-        if (buf.len < ARPSIZE) return error.ArpBufferTooSmall;
+        if (buf.len < ARPSIZE) return error.BufferTooSmall;
 
         var offset: usize = 0;
 
