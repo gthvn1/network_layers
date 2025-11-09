@@ -166,12 +166,10 @@ pub fn main() !void {
 
         switch (ether_frame.ether_type) {
             .arp => {
-                if (n != 42) {
-                    std.log.warn("We are expecting 42 bytes for arp", .{});
-                    std.log.warn(" -> 14 bytes header + 28 bytes ARP payload", .{});
-                    continue :loop;
-                }
-                a.dumpArp(frame_buf[0..42]);
+                const arp_frame = try a.ArpPacket.parse(ether_frame.payload);
+                var buf: [17]u8 = undefined;
+                std.log.debug("Sender mac is {s}", .{h.macToString(&arp_frame.sender_mac, &buf)});
+                std.log.debug("Target mac is {s}", .{h.macToString(&arp_frame.target_mac, &buf)});
             },
             .ipv4 => std.log.warn("IPv4 is not yet supported", .{}),
             .ipv6 => std.log.warn("IPv6 is not yet supported", .{}),
