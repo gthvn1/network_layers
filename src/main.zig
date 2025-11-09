@@ -113,6 +113,21 @@ pub fn main() !void {
     // ------------------------------------------------------------------------
     // Main loop
     loop: while (!should_quit.load(.acquire)) {
+        var fds = [_]posix.pollfd{
+            .fd = sock,
+            .events = posix.POLL.IN,
+        };
+
+        // We are waiting for events on the socket or timeout after 100ms so if ctrl-c is pressed
+        // we will be able to stop quickly. Otherwise we wait for packets coming in to trigger the
+        // loop condition and quit.
+        posix.poll(fds, 100) catch continue;
+
+        if (fds[0].revents == 0) {
+            // We hit the timeout, continue
+            continue :loop;
+        }
+
         const n = posix.read(sock, &frame_buf) catch |err| {
             std.log.err("Failed to read data: {s}", .{@errorName(err)});
             return;
