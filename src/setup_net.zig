@@ -35,7 +35,7 @@ pub const VirtPair = struct {
     mac_peer: [6]u8,
 };
 
-pub fn linkUp(allocator: std.mem.Allocator, name: []const u8) !void {
+pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) !void {
     const peer_name = try std.fmt.allocPrint(allocator, "{s}-peer", .{name});
     defer allocator.free(peer_name);
 

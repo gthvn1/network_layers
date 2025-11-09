@@ -41,7 +41,8 @@ pub fn main() !void {
     std.log.info("found mac peer: {s}", .{e.macToString(&vp.mac_peer, &mac_buf)});
 
     try s.setIp(allocator, params.iface, "192.168.38.2/24");
-    try s.linkUp(allocator, params.iface);
+    // It also link up the peer
+    try s.linkUpVeth(allocator, params.iface);
     defer {
         s.cleanup(allocator, params.iface) catch {
             std.log.err("failed to cleanup interface {s}", .{params.iface});
@@ -62,15 +63,16 @@ pub fn main() !void {
         return;
     };
     defer posix.close(sockfd);
-
     std.log.info("Socket created", .{});
-    // Now we need to assign an address to it
 
+    // Now we need to assign an address to it. We will bind to the peer interface.
     // Packet socket address: we are testing on Linux
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
+    const peer_iface = try std.fmt.allocPrint(allocator, "{s}-peer\x00", .{params.iface});
+    defer allocator.free(peer_iface);
 
     const phys_layer_protocol = std.mem.nativeToBig(u16, os.linux.ETH.P.ALL); // Every packet !!!
-    const iface_number = std.c.if_nametoindex(params.iface);
+    const iface_number = std.c.if_nametoindex(@ptrCast(peer_iface));
     const arp_hw_type = 0;
     const packet_type = os.linux.PACKET.BROADCAST;
     const size_of_addr = vp.mac.len;
@@ -95,7 +97,7 @@ pub fn main() !void {
         std.log.err("Failed to bound endpoint: {s}", .{@errorName(err)});
         return;
     };
-    std.log.info("Bound to interface {s}", .{params.iface});
+    std.log.info("Bound to interface {s}", .{peer_iface});
 
     var frame_buf: [1024]u8 = undefined;
 
