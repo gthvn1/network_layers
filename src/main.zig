@@ -29,7 +29,9 @@ pub fn main() !void {
             p.ArgsError.Help => {},
             p.ArgsError.IfaceMissing => std.log.err("Interface is missing", .{}),
             p.ArgsError.IfaceArgMissing => std.log.err("Interface requires an argument", .{}),
-            p.ArgsError.NoParams => std.log.err("Interface and MAC address are missing", .{}),
+            p.ArgsError.IpMissing => std.log.err("IP is missing", .{}),
+            p.ArgsError.IpArgMissing => std.log.err("IP requires an argument", .{}),
+            p.ArgsError.NoParams => std.log.err("All parameters are missing", .{}),
         }
         return;
     };
@@ -48,7 +50,7 @@ pub fn main() !void {
     std.log.info("found mac: {s}", .{e.macToString(&vp.mac, &mac_buf)});
     std.log.info("found mac peer: {s}", .{e.macToString(&vp.mac_peer, &mac_buf)});
 
-    try s.setIp(allocator, params.iface, "192.168.38.2/24");
+    try s.setIp(allocator, params.iface, params.ip);
     // It also link up the peer
     try s.linkUpVeth(allocator, params.iface);
     defer {
