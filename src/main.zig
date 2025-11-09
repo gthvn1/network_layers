@@ -158,12 +158,12 @@ pub fn main() !void {
             std.debug.print("\n--- Done\n", .{});
         }
 
-        // To get the ethertype we need the first 18th bytes.
         const ether_frame = e.EthernetFrame.parse(frame_buf[0..]) orelse {
-            std.log.err("Something goes wrong when reading ether type", .{});
+            std.log.err("Something goes wrong when getting ethernet frame", .{});
             continue :loop;
         };
 
+        // Check the ethertype
         switch (ether_frame.ether_type) {
             .arp => {
                 const arp_frame = try a.ArpPacket.parse(ether_frame.payload);
