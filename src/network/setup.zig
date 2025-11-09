@@ -1,5 +1,5 @@
 const std = @import("std");
-const ethernet = @import("ethernet.zig");
+const helper = @import("helper.zig");
 
 const Interface = struct {
     ifindex: i32,
@@ -155,7 +155,7 @@ fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) !bo
     const iface = interfaces.value[0];
     if (std.mem.eql(u8, name, iface.ifname)) {
         if (iface.address) |addr| {
-            try ethernet.stringToMac(addr, buf);
+            try helper.stringToMac(addr, buf);
             return true;
         }
     }

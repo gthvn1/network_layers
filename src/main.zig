@@ -7,6 +7,7 @@ const p = @import("params.zig");
 const network = @import("network.zig");
 const a = network.arp;
 const e = network.ethernet;
+const h = network.helper;
 const s = network.setup;
 
 var should_quit = std.atomic.Value(bool).init(false);
@@ -47,8 +48,8 @@ pub fn main() !void {
     // --------------------------- SETUP ---------------------------------------
     var mac_buf: [17]u8 = undefined;
     const vp: s.VirtPair = try s.getOrCreateVeth(allocator, params.iface);
-    std.log.info("found mac: {s}", .{e.macToString(&vp.mac, &mac_buf)});
-    std.log.info("found mac peer: {s}", .{e.macToString(&vp.mac_peer, &mac_buf)});
+    std.log.info("found mac: {s}", .{h.macToString(&vp.mac, &mac_buf)});
+    std.log.info("found mac peer: {s}", .{h.macToString(&vp.mac_peer, &mac_buf)});
 
     try s.setIp(allocator, params.iface, params.ip);
     // It also link up the peer

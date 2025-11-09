@@ -1,22 +1,18 @@
 const std = @import("std");
 
-const e = @import("ethernet.zig");
+const h = @import("helper.zig");
 
 // +--------------------------------------------------------+
 // | Ethernet Header (14 bytes standard)                    |
 // |--------------------------------------------------------|
 // | Destination MAC (6) | Source MAC (6) | EtherType (2)   |
 // +--------------------------------------------------------+
-// | VLAN Tag (optional, 4 bytes)                           |
-// |--------------------------------------------------------|
-// | TPID (2) | TCI (2)                                     |
+//
 // +--------------------------------------------------------+
 // | ARP Payload (28 bytes standard for Ethernet/IPv4)      |
 // |--------------------------------------------------------|
 // | HTYPE (2) | PTYPE (2) | HLEN (1) | PLEN (1) | OPER (2) |
 // | SHA (6) | SPA (4) | THA (6) | TPA (4)                  |
-// +--------------------------------------------------------+
-// | Frame Check Sequence (FCS, 4 bytes, added by NIC)      |
 // +--------------------------------------------------------+
 //
 // Ethernet II layout begins with:
@@ -27,32 +23,54 @@ const e = @import("ethernet.zig");
 // [RFC ARP] https://datatracker.ietf.org/doc/html/rfc826
 //
 // Here is an example of what we are receiving from arping:
-// ff ff ff ff ff ff f2 4e 68 82
-// e2 1b 08 06 00 01 08 00 06 04
-// 00 01 f2 4e 68 82 e2 1b c0 a8
-// 26 02 ff ff ff ff ff ff c0 a8
-// 26 03
+// ff ff ff ff ff ff  -> ETHERNET: broadcast
+// f2 4e 68 82 e2 1b  -> ETHERNET: sender's MAC address
+// 08 06              -> ETHERNET: ARP protocol
 //
-// We are expecting 42 bytes
-// ARP is 28 bytes -> 224 bits
+// 00 01              -> ARP: Hardware type
+// 08 00              -> ARP: Protocl type
+// 06                 -> ARP: Hardware size
+// 04                 -> ARP: Protocol size
+// 00 01              -> ARP: Opcode
+// f2 4e 68 82 e2 1b  -> ARP: Sender MAC
+// c0 a8 26 02        -> ARP: Sender IP
+// ff ff ff ff ff ff  -> ARP: Target MAC
+// c0 a8 26 03        -> ARP: Target IP
 //
 // https://en.wikipedia.org/wiki/Address_Resolution_Protocol
+const Oper = enum(u16) {
+    request = 1,
+    reply = 2,
+};
+
 pub const ArpPacket = packed struct {
     hw_type: u16, // Hardware type (1 = Ethernet)
     proto_type: u16, // Protocol type (0x0800 = IPv4)
     hw_addr_len: u8, // Hardware address length (6 for MAC)
     proto_addr_len: u8, // Protocol address length (4 for IPv4)
-    operation: u16, // 1 = request, 2 = reply
+    operation: Oper,
     sender_mac: [6]u8, // Sender MAC address
     sender_ip: [4]u8, // Sender IP address
     target_mac: [6]u8, // Target MAC address
     target_ip: [4]u8, // Target IP address
 };
 
+pub fn parseArpPacket(buf: []const u8) !ArpPacket {
+    if (@sizeOf(ArpPacket) != 28) {
+        return error.ArpPacketStructHasWrongSize;
+    }
+
+    if (buf.len != @sizeOf(ArpPacket)) {
+        return error.ArpBufferHasWrongSize;
+    }
+
+    return std.mem.bytesToValue(ArpPacket, buf);
+}
+
 pub fn dumpArp(frame: *const [42]u8) void {
     var tmp_buf: [17]u8 = undefined;
-    std.log.info("DestMac: {s}", .{e.macToString(frame[0..6], &tmp_buf)});
-    std.log.info("SrcMac : {s}", .{e.macToString(frame[6..12], &tmp_buf)});
+    std.log.info("DestMac: {s}", .{h.macToString(frame[0..6], &tmp_buf)});
+    std.log.info("SrcMac : {s}", .{h.macToString(frame[6..12], &tmp_buf)});
 }
 
 // TODO: check code for handling arp and ip and use it...
