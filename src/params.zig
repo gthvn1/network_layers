@@ -79,12 +79,12 @@ fn usage(prog: []const u8) void {
         \\  {s} --iface <interface> --ip <ipv4 address>
         \\
         \\DESCRIPTION:
-        \\  If <interface> does not exist, a virtual Ethernet pair will be created:
-        \\    <interface> <-> <interface>-peer
-        \\  Otherwise nothing is done.
+        \\  If <interface> does not exist, a virtual Ethernet pair will be
+        \\  created: <interface> <-> <interface>-peer
+        \\  Otherwise, the existing interface is used.
         \\
-        \\  The ip at format xx.xx.xx.xx/yy is expected. This address will be used to
-        \\  set the ip of <interfacce>.
+        \\  The IP address must be in CIDR notation (xx.xx.xx.xx/yy). This
+        \\  address will be assigned to <interfacce>.
         \\ 
         \\  The program will then listen on <interface>-peer for incoming Ethernet frames.
         \\  The MAC addresses are discovered automatically.
@@ -93,10 +93,10 @@ fn usage(prog: []const u8) void {
         \\  sudo {s} --iface veth0 --ip 192.168.38.2/24
         \\
         \\NOTES:
-        \\  - Requires CAP_NET_ADMIN and CAP_NET_RAW privileges.
+        \\  - Requires root privileges or CAP_NET_ADMIN and CAP_NET_RAW capabilites.
         \\  - The virtual pair is created using:
         \\        ip link add <iface> type veth peer name <iface>-peer
-        \\  - This is useful for testing or simulating low-level networking (e.g., ARP, ICMP).
+        \\  - Useful for testing or simulating Layer 2 protocols (e.g., ARP).
         \\
     ,
         .{ prog, prog },
