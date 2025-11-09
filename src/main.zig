@@ -174,7 +174,24 @@ pub fn main() !void {
                 std.log.debug("Target ip  : {s}", .{h.ipv4ToString(&arp_frame.target_ip, buf[0..15])});
 
                 if (arp_frame.operation == .request) {
-                    std.log.debug("TODO: Reply to the ARP request", .{});
+                    // We reply to all IPs
+                    var reply_buf: [42]u8 = undefined;
+                    var arp_payload: [28]u8 = undefined;
+                    const arp_reply = arp_frame.createReply(vp.mac_peer, arp_frame.target_ip);
+                    try arp_reply.serialize(arp_payload[0..]);
+                    _ = try e.EthernetFrame.build(
+                        &reply_buf,
+                        arp_frame.sender_mac,
+                        vp.mac_peer,
+                        e.EtherType.arp,
+                        arp_payload[0..],
+                    );
+
+                    const bytes_written = posix.write(sockfd, &reply_buf) catch |err| {
+                        std.log.err("Failed to write arp reply: {s}", .{@errorName(err)});
+                        return;
+                    };
+                    std.log.debug("Send ARP reply: {d} bytes", .{bytes_written});
                 }
             },
             .ipv4 => std.log.warn("IPv4 is not yet supported", .{}),
