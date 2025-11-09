@@ -15,7 +15,7 @@ zig build && sudo ./zig-out/bin/netl2 --iface veth0 --ip 192.168.38.2/24
 
 # Current status
 - [x] read raw frame
-- [ ] parse incoming ARP
+- [x] parse incoming ARP
 - [ ] construct ARP reply
 - [ ] send the frame back
 - [ ] ...
