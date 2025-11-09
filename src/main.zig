@@ -139,10 +139,8 @@ pub fn main() !void {
         // loop condition and quit.
         const ret = posix.poll(&fds, 100) catch continue;
 
-        if (ret == 0) {
-            // We hit the timeout, continue
-            continue :loop;
-        }
+        // ret 0 means we hit the timeout, continue
+        if (ret == 0) continue :loop;
 
         const n = posix.read(sockfd, &frame_buf) catch |err| {
             std.log.err("Failed to read data: {s}", .{@errorName(err)});
@@ -161,19 +159,18 @@ pub fn main() !void {
         }
 
         // To get the ethertype we need the first 18th bytes.
-        const ether_type = e.getEtherType(frame_buf[0..18]) orelse {
+        const ether_frame = e.EthernetFrame.parse(frame_buf[0..]) orelse {
             std.log.err("Something goes wrong when reading ether type", .{});
             continue :loop;
         };
 
-        switch (ether_type) {
+        switch (ether_frame.ether_type) {
             .arp => {
                 if (n != 42) {
                     std.log.warn("We are expecting 42 bytes for arp", .{});
                     std.log.warn(" -> 14 bytes header + 28 bytes ARP payload", .{});
                     continue :loop;
                 }
-
                 a.dumpArp(frame_buf[0..42]);
             },
             .ipv4 => std.log.warn("IPv4 is not yet supported", .{}),
@@ -183,30 +180,4 @@ pub fn main() !void {
     }
 
     std.debug.print("Cleaning in progress...\n", .{});
-}
-
-fn handleIp(sockfd: posix.fd_t, frame: []u8, n: usize, my_mac: []const u8, my_ip: []const u8) void {
-    if (n < 42) return;
-    const proto = frame[23];
-    const dst_ip = frame[30..34];
-    if (!std.mem.eql(u8, dst_ip, my_ip)) return;
-
-    if (proto == 1) { // ICMP
-        const icmp_type = frame[34];
-        if (icmp_type == 8) { // echo request
-            var reply = frame[0..n].*;
-            // swap MACs
-            std.mem.copy(u8, reply[0..6], frame[6..12]);
-            std.mem.copy(u8, reply[6..12], my_mac);
-            // swap IPs
-            std.mem.copy(u8, reply[26..30], frame[30..34]);
-            std.mem.copy(u8, reply[30..34], frame[26..30]);
-            reply[34] = 0; // type = echo reply
-            // recalc checksum (quick fix)
-            reply[36] = 0;
-            reply[37] = 0;
-            _ = posix.write(sockfd, &reply);
-            std.debug.print("Replied to ICMP echo from {d}.{d}.{d}.{d}\n", .{ frame[26], frame[27], frame[28], frame[29] });
-        }
-    }
 }
