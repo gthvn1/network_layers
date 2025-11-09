@@ -57,11 +57,11 @@ pub fn main() !void {
     // Raw packets include the link-layer header. We don't have the preambule and start frame
     // delimiter.
     const family = posix.AF.PACKET;
-    const sock = posix.socket(family, posix.SOCK.RAW, 0) catch |err| {
+    const sockfd = posix.socket(family, posix.SOCK.RAW, 0) catch |err| {
         std.log.err("Failed to create endpoint: {s}", .{@errorName(err)});
         return;
     };
-    defer posix.close(sock);
+    defer posix.close(sockfd);
 
     std.log.info("Socket created", .{});
     // Now we need to assign an address to it
@@ -91,7 +91,7 @@ pub fn main() !void {
 
     std.log.info("Interface index: {}", .{iface_number});
 
-    posix.bind(sock, @ptrCast(&addr), @sizeOf(posix.sockaddr.ll)) catch |err| {
+    posix.bind(sockfd, @ptrCast(&addr), @sizeOf(posix.sockaddr.ll)) catch |err| {
         std.log.err("Failed to bound endpoint: {s}", .{@errorName(err)});
         return;
     };
@@ -114,21 +114,24 @@ pub fn main() !void {
     // Main loop
     loop: while (!should_quit.load(.acquire)) {
         var fds = [_]posix.pollfd{
-            .fd = sock,
-            .events = posix.POLL.IN,
+            .{
+                .fd = sockfd,
+                .events = posix.POLL.IN,
+                .revents = 0,
+            },
         };
 
         // We are waiting for events on the socket or timeout after 100ms so if ctrl-c is pressed
         // we will be able to stop quickly. Otherwise we wait for packets coming in to trigger the
         // loop condition and quit.
-        posix.poll(fds, 100) catch continue;
+        _ = posix.poll(&fds, 100) catch continue;
 
         if (fds[0].revents == 0) {
             // We hit the timeout, continue
             continue :loop;
         }
 
-        const n = posix.read(sock, &frame_buf) catch |err| {
+        const n = posix.read(sockfd, &frame_buf) catch |err| {
             std.log.err("Failed to read data: {s}", .{@errorName(err)});
             return;
         };
@@ -169,7 +172,7 @@ pub fn main() !void {
     std.debug.print("Cleaning in progress...\n", .{});
 }
 
-fn handleIp(sock: posix.fd_t, frame: []u8, n: usize, my_mac: []const u8, my_ip: []const u8) void {
+fn handleIp(sockfd: posix.fd_t, frame: []u8, n: usize, my_mac: []const u8, my_ip: []const u8) void {
     if (n < 42) return;
     const proto = frame[23];
     const dst_ip = frame[30..34];
@@ -189,7 +192,7 @@ fn handleIp(sock: posix.fd_t, frame: []u8, n: usize, my_mac: []const u8, my_ip: 
             // recalc checksum (quick fix)
             reply[36] = 0;
             reply[37] = 0;
-            _ = posix.write(sock, &reply);
+            _ = posix.write(sockfd, &reply);
             std.debug.print("Replied to ICMP echo from {d}.{d}.{d}.{d}\n", .{ frame[26], frame[27], frame[28], frame[29] });
         }
     }
