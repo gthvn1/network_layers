@@ -124,9 +124,9 @@ pub fn main() !void {
         // We are waiting for events on the socket or timeout after 100ms so if ctrl-c is pressed
         // we will be able to stop quickly. Otherwise we wait for packets coming in to trigger the
         // loop condition and quit.
-        _ = posix.poll(&fds, 100) catch continue;
+        const ret = posix.poll(&fds, 100) catch continue;
 
-        if (fds[0].revents == 0) {
+        if (ret == 0) {
             // We hit the timeout, continue
             continue :loop;
         }
