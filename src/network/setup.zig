@@ -36,8 +36,8 @@ pub const VirtPair = struct {
 };
 
 pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) !void {
-    const peer_name = try std.fmt.allocPrint(allocator, "{s}-peer", .{name});
-    defer allocator.free(peer_name);
+    var peer_iface_buf: [std.posix.IFNAMESIZE:0]u8 = undefined;
+    const peer_iface = try std.fmt.bufPrintZ(&peer_iface_buf, "{s}-peer\x00", .{name});
 
     const cmd1 = [_][]const u8{ "ip", "link", "set", name, "up" };
 
@@ -50,7 +50,7 @@ pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) !void {
     }
 
     std.log.info("ip link set {s} up", .{name});
-    const cmd2 = [_][]const u8{ "ip", "link", "set", peer_name, "up" };
+    const cmd2 = [_][]const u8{ "ip", "link", "set", peer_iface, "up" };
 
     var res2 = try runCmd(allocator, &cmd2);
     defer res2.deinit();
@@ -60,7 +60,7 @@ pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) !void {
         return error.IpLinkUpFailed;
     }
 
-    std.log.info("ip link set {s} up", .{peer_name});
+    std.log.info("ip link set {s} up", .{peer_iface});
 }
 
 // TODO: we probably want to keep the name of the peer somewhere instead

@@ -34,6 +34,12 @@ pub fn main() !void {
         return;
     };
 
+    // We will use it as virtual pair so we need to have place to add "-peer\x00".
+    if (params.iface.len >= std.posix.IFNAMESIZE + 6) {
+        std.log.err("Name of interface too long", .{});
+        return error.IfaceNameTooLong;
+    }
+
     std.log.info("params: iface: {s}", .{params.iface});
 
     // --------------------------- SETUP ---------------------------------------
@@ -70,8 +76,8 @@ pub fn main() !void {
     // Now we need to assign an address to it. We will bind to the peer interface.
     // Packet socket address: we are testing on Linux
     // https://www.man7.org/linux/man-pages/man7/packet.7.html
-    const peer_iface = try std.fmt.allocPrint(allocator, "{s}-peer\x00", .{params.iface});
-    defer allocator.free(peer_iface);
+    var peer_iface_buf: [std.posix.IFNAMESIZE:0]u8 = undefined;
+    const peer_iface = try std.fmt.bufPrintZ(&peer_iface_buf, "{s}-peer\x00", .{params.iface});
 
     const phys_layer_protocol = std.mem.nativeToBig(u16, os.linux.ETH.P.ALL); // Every packet !!!
     const iface_number = std.c.if_nametoindex(@ptrCast(peer_iface));
