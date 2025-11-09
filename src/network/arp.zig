@@ -38,7 +38,7 @@ const h = @import("helper.zig");
 // c0 a8 26 03        -> ARP: Target IP
 //
 // https://en.wikipedia.org/wiki/Address_Resolution_Protocol
-const ArpOper = enum(u16) {
+pub const ArpOper = enum(u16) {
     request = 1,
     reply = 2,
 };

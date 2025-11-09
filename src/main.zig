@@ -168,8 +168,14 @@ pub fn main() !void {
             .arp => {
                 const arp_frame = try a.ArpPacket.parse(ether_frame.payload);
                 var buf: [17]u8 = undefined;
-                std.log.debug("Sender mac is {s}", .{h.macToString(&arp_frame.sender_mac, &buf)});
-                std.log.debug("Target mac is {s}", .{h.macToString(&arp_frame.target_mac, &buf)});
+                std.log.debug("Sender mac : {s}", .{h.macToString(&arp_frame.sender_mac, buf[0..17])});
+                std.log.debug("Target mac : {s}", .{h.macToString(&arp_frame.target_mac, buf[0..17])});
+                std.log.debug("Sender ip  : {s}", .{h.ipv4ToString(&arp_frame.sender_ip, buf[0..15])});
+                std.log.debug("Target ip  : {s}", .{h.ipv4ToString(&arp_frame.target_ip, buf[0..15])});
+
+                if (arp_frame.operation == .request) {
+                    std.log.debug("TODO: Reply to the ARP request", .{});
+                }
             },
             .ipv4 => std.log.warn("IPv4 is not yet supported", .{}),
             .ipv6 => std.log.warn("IPv6 is not yet supported", .{}),
