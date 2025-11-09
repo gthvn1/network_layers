@@ -48,8 +48,8 @@ pub fn main() !void {
     // --------------------------- SETUP ---------------------------------------
     var mac_buf: [17]u8 = undefined;
     const vp: s.VirtPair = try s.getOrCreateVeth(allocator, params.iface);
-    std.log.info("found mac: {s}", .{h.macToString(&vp.mac, &mac_buf)});
-    std.log.info("found mac peer: {s}", .{h.macToString(&vp.mac_peer, &mac_buf)});
+    std.log.info("found mac: {s}", .{h.macToString(vp.mac[0..6], &mac_buf)});
+    std.log.info("found mac peer: {s}", .{h.macToString(vp.mac_peer[0..6], &mac_buf)});
 
     try s.setIp(allocator, params.iface, params.ip);
     // It also link up the peer
@@ -90,7 +90,7 @@ pub fn main() !void {
 
     // for sockaddr.ll addr is [8]u8
     var mac = [_]u8{0} ** 8;
-    std.mem.copyForwards(u8, &mac, &vp.mac);
+    std.mem.copyForwards(u8, mac[0..], vp.mac[0..6]);
 
     const addr: posix.sockaddr.ll = .{
         .family = family,
@@ -110,8 +110,6 @@ pub fn main() !void {
     };
     std.log.info("Bound to interface {s}", .{peer_iface});
 
-    var frame_buf: [1024]u8 = undefined;
-
     // Set up signal handler for SIGINT (Ctrl-C)
     const signal_action = posix.Sigaction{
         .handler = .{ .handler = handleSigint },
@@ -126,6 +124,7 @@ pub fn main() !void {
     // ------------------------------------------------------------------------
     // Main loop
     loop: while (!should_quit.load(.acquire)) {
+        var frame_buf: [1024]u8 = undefined;
         var fds = [_]posix.pollfd{
             .{
                 .fd = sockfd,
@@ -142,7 +141,7 @@ pub fn main() !void {
         // ret 0 means we hit the timeout, continue
         if (ret == 0) continue :loop;
 
-        const n = posix.read(sockfd, &frame_buf) catch |err| {
+        const n = posix.read(sockfd, frame_buf[0..]) catch |err| {
             std.log.err("Failed to read data: {s}", .{@errorName(err)});
             return;
         };
@@ -167,11 +166,12 @@ pub fn main() !void {
         switch (ether_frame.ether_type) {
             .arp => {
                 const arp_frame = try a.ArpPacket.parse(ether_frame.payload);
-                var buf: [17]u8 = undefined;
-                std.log.debug("Sender mac : {s}", .{h.macToString(&arp_frame.sender_mac, buf[0..17])});
-                std.log.debug("Target mac : {s}", .{h.macToString(&arp_frame.target_mac, buf[0..17])});
-                std.log.debug("Sender ip  : {s}", .{h.ipv4ToString(&arp_frame.sender_ip, buf[0..15])});
-                std.log.debug("Target ip  : {s}", .{h.ipv4ToString(&arp_frame.target_ip, buf[0..15])});
+                var buf_mac: [17]u8 = undefined;
+                var buf_ip: [15]u8 = undefined;
+                std.log.debug("Sender mac : {s}", .{h.macToString(arp_frame.sender_mac[0..], &buf_mac)});
+                std.log.debug("Target mac : {s}", .{h.macToString(arp_frame.target_mac[0..], &buf_mac)});
+                std.log.debug("Sender ip  : {s}", .{h.ipv4ToString(arp_frame.sender_ip[0..], &buf_ip)});
+                std.log.debug("Target ip  : {s}", .{h.ipv4ToString(arp_frame.target_ip[0..], &buf_ip)});
 
                 if (arp_frame.operation == .request) {
                     // We reply to all IPs
@@ -180,14 +180,14 @@ pub fn main() !void {
                     const arp_reply = arp_frame.createReply(vp.mac_peer, arp_frame.target_ip);
                     try arp_reply.serialize(arp_payload[0..]);
                     _ = try e.EthernetFrame.build(
-                        &reply_buf,
+                        reply_buf[0..],
                         arp_frame.sender_mac,
                         vp.mac_peer,
                         e.EtherType.arp,
                         arp_payload[0..],
                     );
 
-                    const bytes_written = posix.write(sockfd, &reply_buf) catch |err| {
+                    const bytes_written = posix.write(sockfd, reply_buf[0..]) catch |err| {
                         std.log.err("Failed to write arp reply: {s}", .{@errorName(err)});
                         return;
                     };
