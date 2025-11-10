@@ -168,51 +168,57 @@ pub fn main() !void {
 
         // Check the ethertype
         switch (ether_frame.ether_type) {
-            .arp => {
-                const arp_frame = try arp.ArpPacket.parse(ether_frame.payload);
-
-                var buf_mac: [17]u8 = undefined;
-                std.log.debug("Sender mac : {s}", .{h.macToString(arp_frame.sender_mac[0..], &buf_mac)});
-                std.log.debug("Target mac : {s}", .{h.macToString(arp_frame.target_mac[0..], &buf_mac)});
-
-                var buf_ip: [15]u8 = undefined;
-                std.log.debug("Sender ip  : {s}", .{h.ipv4ToString(arp_frame.sender_ip[0..], &buf_ip)});
-                std.log.debug("Target ip  : {s}", .{h.ipv4ToString(arp_frame.target_ip[0..], &buf_ip)});
-
-                if (arp_frame.operation == .request) {
-                    // We reply to all IPs
-                    var reply_buf: [42]u8 = undefined;
-                    var arp_payload: [28]u8 = undefined;
-                    const arp_reply = arp_frame.createReply(vp.mac_peer, arp_frame.target_ip);
-                    try arp_reply.serialize(arp_payload[0..]);
-                    _ = try eth.EthernetFrame.build(
-                        reply_buf[0..],
-                        arp_frame.sender_mac,
-                        vp.mac_peer,
-                        eth.EtherType.arp,
-                        arp_payload[0..],
-                    );
-
-                    const bytes_written = posix.write(sockfd, reply_buf[0..]) catch |err| {
-                        std.log.err("Failed to write arp reply: {s}", .{@errorName(err)});
-                        return;
-                    };
-                    std.log.debug("Send ARP reply: {d} bytes", .{bytes_written});
-                }
-            },
-            .ipv4 => {
-                const ipv4_packet = try ip.Ipv4Packet.parse(ether_frame.payload);
-                switch (ipv4_packet.protocol) {
-                    .icmp => icmp.handle(ipv4_packet.payload),
-                    .tcp => std.log.warn("TCP is not yet supported", .{}),
-                    .udp => std.log.warn("UDP is not yet supported", .{}),
-                    _ => |protocol| std.log.err("{d} is an unknown protocol", .{protocol}),
-                }
-            },
+            .arp => try handleArp(sockfd, ether_frame, vp.mac_peer),
+            .ipv4 => try handleIpv4(sockfd, ether_frame),
             .ipv6 => std.log.warn("IPv6 is not yet supported", .{}),
             .unknown => std.log.warn("Unkown ethertype", .{}),
         }
     }
 
     std.debug.print("Cleaning in progress...\n", .{});
+}
+
+fn handleIpv4(sockfd: std.posix.fd_t, frame: eth.EthernetFrame) !void {
+    _ = sockfd;
+
+    const ipv4_packet = try ip.Ipv4Packet.parse(frame.payload);
+    switch (ipv4_packet.protocol) {
+        .icmp => icmp.handle(ipv4_packet.payload),
+        .tcp => std.log.warn("TCP is not yet supported", .{}),
+        .udp => std.log.warn("UDP is not yet supported", .{}),
+        _ => |protocol| std.log.err("{d} is an unknown protocol", .{protocol}),
+    }
+}
+
+fn handleArp(sockfd: std.posix.fd_t, frame: eth.EthernetFrame, mac_peer: [6]u8) !void {
+    const arp_frame = try arp.ArpPacket.parse(frame.payload);
+
+    var buf_mac: [17]u8 = undefined;
+    std.log.debug("Sender mac : {s}", .{h.macToString(arp_frame.sender_mac[0..], &buf_mac)});
+    std.log.debug("Target mac : {s}", .{h.macToString(arp_frame.target_mac[0..], &buf_mac)});
+
+    var buf_ip: [15]u8 = undefined;
+    std.log.debug("Sender ip  : {s}", .{h.ipv4ToString(arp_frame.sender_ip[0..], &buf_ip)});
+    std.log.debug("Target ip  : {s}", .{h.ipv4ToString(arp_frame.target_ip[0..], &buf_ip)});
+
+    if (arp_frame.operation == .request) {
+        // We reply to all IPs
+        var reply_buf: [42]u8 = undefined;
+        var arp_payload: [28]u8 = undefined;
+        const arp_reply = arp_frame.createReply(mac_peer, arp_frame.target_ip);
+        try arp_reply.serialize(arp_payload[0..]);
+        _ = try eth.EthernetFrame.build(
+            reply_buf[0..],
+            arp_frame.sender_mac,
+            mac_peer,
+            eth.EtherType.arp,
+            arp_payload[0..],
+        );
+
+        const bytes_written = posix.write(sockfd, reply_buf[0..]) catch |err| {
+            std.log.err("Failed to write arp reply: {s}", .{@errorName(err)});
+            return;
+        };
+        std.log.debug("Send ARP reply: {d} bytes", .{bytes_written});
+    }
 }
