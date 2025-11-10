@@ -183,7 +183,13 @@ fn handleIpv4(sockfd: std.posix.fd_t, frame: eth.EthernetFrame) !void {
 
     const ipv4_packet = try ip.Ipv4Packet.parse(frame.payload);
     switch (ipv4_packet.protocol) {
-        .icmp => icmp.handle(ipv4_packet.payload),
+        .icmp => {
+            const icmp_packet = try icmp.IcmpPacket.parse(ipv4_packet.payload);
+            switch (icmp_packet.icmp_type) {
+                .echo_request => icmp.handle(ipv4_packet.payload),
+                else => std.log.warn("Only ICMP echo are supported", .{}),
+            }
+        },
         .tcp => std.log.warn("TCP is not yet supported", .{}),
         .udp => std.log.warn("UDP is not yet supported", .{}),
         _ => |protocol| std.log.err("{d} is an unknown protocol", .{protocol}),
