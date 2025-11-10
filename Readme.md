@@ -11,13 +11,17 @@
 ```
 zig build && sudo ./zig-out/bin/netl2 --iface veth0 --ip 192.168.38.2/24
 ```
+- This will create: `veth0 (192.168.38.2/24) <----> veth0-peer (Zig code listening)`
   - You need to be root or set capabilite. See `cap_net_raw+ep` below.
 
 # Current status
 - [x] read raw frame
 - [x] parse incoming ARP
-- [ ] construct ARP reply
-- [ ] send the frame back
+- [x] construct ARP reply
+- [x] send the frame back
+- [ ] parse IPv4 header
+- [ ] parse ICMP
+- [ ] reply to ICMP
 - [ ] ...
 
 # Tests
