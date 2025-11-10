@@ -28,7 +28,7 @@ pub const EthernetFrame = struct {
         @memcpy(buf[6..12], &src_mac);
 
         // EtherType
-        std.mem.writeInt(u16, buf[12..14][0..2], @intFromEnum(ether_type), .big);
+        std.mem.writeInt(u16, buf[12..14], @intFromEnum(ether_type), .big);
 
         // Payload
         @memcpy(buf[header_len..total_len], payload);

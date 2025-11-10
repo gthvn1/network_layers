@@ -166,10 +166,12 @@ pub fn main() !void {
         switch (ether_frame.ether_type) {
             .arp => {
                 const arp_frame = try a.ArpPacket.parse(ether_frame.payload);
+
                 var buf_mac: [17]u8 = undefined;
-                var buf_ip: [15]u8 = undefined;
                 std.log.debug("Sender mac : {s}", .{h.macToString(arp_frame.sender_mac[0..], &buf_mac)});
                 std.log.debug("Target mac : {s}", .{h.macToString(arp_frame.target_mac[0..], &buf_mac)});
+
+                var buf_ip: [15]u8 = undefined;
                 std.log.debug("Sender ip  : {s}", .{h.ipv4ToString(arp_frame.sender_ip[0..], &buf_ip)});
                 std.log.debug("Target ip  : {s}", .{h.ipv4ToString(arp_frame.target_ip[0..], &buf_ip)});
 
@@ -191,7 +193,7 @@ pub fn main() !void {
                         std.log.err("Failed to write arp reply: {s}", .{@errorName(err)});
                         return;
                     };
-                    std.log.debug("Send ARP reply: {d} bytes", .{bytes_written});
+                    std.log.debug("Send ARP reply: {d} bytes", .{bytes_written});
                 }
             },
             .ipv4 => std.log.warn("IPv4 is not yet supported", .{}),

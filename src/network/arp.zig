@@ -59,37 +59,23 @@ pub const ArpPacket = struct {
     pub fn parse(buf: []const u8) !ArpPacket {
         if (buf.len < ARPSIZE) return error.BufferTooSmall;
 
-        var offset: usize = 0;
-
-        const hw_type = std.mem.readInt(u16, buf[offset..][0..2], .big);
-        offset += 2;
-
-        const proto_type = std.mem.readInt(u16, buf[offset..][0..2], .big);
-        offset += 2;
-
-        const hw_addr_len = buf[offset];
-        offset += 1;
-
-        const proto_addr_len = buf[offset];
-        offset += 1;
-
-        const operation: ArpOper = @enumFromInt(std.mem.readInt(u16, buf[offset..][0..2], .big));
-        offset += 2;
+        const hw_type = std.mem.readInt(u16, buf[0..2], .big);
+        const proto_type = std.mem.readInt(u16, buf[2..4], .big);
+        const hw_addr_len = buf[4];
+        const proto_addr_len = buf[5];
+        const operation: ArpOper = @enumFromInt(std.mem.readInt(u16, buf[6..8], .big));
 
         var sender_mac: [6]u8 = undefined;
-        @memcpy(&sender_mac, buf[offset..][0..6]);
-        offset += 6;
+        @memcpy(&sender_mac, buf[8..14]);
 
         var sender_ip: [4]u8 = undefined;
-        @memcpy(&sender_ip, buf[offset..][0..4]);
-        offset += 4;
+        @memcpy(&sender_ip, buf[14..18]);
 
         var target_mac: [6]u8 = undefined;
-        @memcpy(&target_mac, buf[offset..][0..6]);
-        offset += 6;
+        @memcpy(&target_mac, buf[18..24]);
 
         var target_ip: [4]u8 = undefined;
-        @memcpy(&target_ip, buf[offset..][0..4]);
+        @memcpy(&target_ip, buf[24..28]);
 
         return ArpPacket{
             .hw_type = hw_type,
@@ -107,33 +93,15 @@ pub const ArpPacket = struct {
     pub fn serialize(self: ArpPacket, buf: []u8) !void {
         if (buf.len < 28) return error.BufferTooSmall;
 
-        var offset: usize = 0;
-
-        std.mem.writeInt(u16, buf[offset..][0..2], self.hw_type, .big);
-        offset += 2;
-
-        std.mem.writeInt(u16, buf[offset..][0..2], self.proto_type, .big);
-        offset += 2;
-
-        buf[offset] = self.hw_addr_len;
-        offset += 1;
-
-        buf[offset] = self.proto_addr_len;
-        offset += 1;
-
-        std.mem.writeInt(u16, buf[offset..][0..2], @intFromEnum(self.operation), .big);
-        offset += 2;
-
-        @memcpy(buf[offset..][0..6], &self.sender_mac);
-        offset += 6;
-
-        @memcpy(buf[offset..][0..4], &self.sender_ip);
-        offset += 4;
-
-        @memcpy(buf[offset..][0..6], &self.target_mac);
-        offset += 6;
-
-        @memcpy(buf[offset..][0..4], &self.target_ip);
+        std.mem.writeInt(u16, buf[0..2], self.hw_type, .big);
+        std.mem.writeInt(u16, buf[2..4], self.proto_type, .big);
+        buf[4] = self.hw_addr_len;
+        buf[5] = self.proto_addr_len;
+        std.mem.writeInt(u16, buf[6..8], @intFromEnum(self.operation), .big);
+        @memcpy(buf[8..14], &self.sender_mac);
+        @memcpy(buf[14..18], &self.sender_ip);
+        @memcpy(buf[18..24], &self.target_mac);
+        @memcpy(buf[24..28], &self.target_ip);
     }
 
     // Allow to create a reply with our MAC and IP
