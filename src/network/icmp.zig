@@ -47,7 +47,7 @@ pub const IcmpPacket = struct {
     }
 };
 
-pub fn handle(payload: []const u8) void {
+pub fn dump(payload: []const u8) void {
     std.log.debug("TODO: Handling ICMP", .{});
     std.debug.print("--- Raw payload\n", .{});
     for (payload, 1..) |b, i| {

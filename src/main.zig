@@ -186,7 +186,7 @@ fn handleIpv4(sockfd: std.posix.fd_t, frame: eth.EthernetFrame) !void {
         .icmp => {
             const icmp_packet = try icmp.IcmpPacket.parse(ipv4_packet.payload);
             switch (icmp_packet.icmp_type) {
-                .echo_request => icmp.handle(ipv4_packet.payload),
+                .echo_request => icmp.dump(ipv4_packet.payload),
                 else => std.log.warn("Only ICMP echo are supported", .{}),
             }
         },
