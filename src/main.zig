@@ -5,10 +5,13 @@ const posix = std.posix;
 const p = @import("params.zig");
 
 const network = @import("network.zig");
-const a = network.arp;
-const e = network.ethernet;
 const h = network.helper;
+
 const s = network.setup;
+
+const arp = network.arp;
+const eth = network.ethernet;
+const ip = network.ip;
 
 var should_quit = std.atomic.Value(bool).init(false);
 
@@ -157,7 +160,7 @@ pub fn main() !void {
             std.debug.print("\n--- Done\n", .{});
         }
 
-        const ether_frame = e.EthernetFrame.parse(frame_buf[0..]) orelse {
+        const ether_frame = eth.EthernetFrame.parse(frame_buf[0..]) orelse {
             std.log.err("Something goes wrong when getting ethernet frame", .{});
             continue :loop;
         };
@@ -165,7 +168,7 @@ pub fn main() !void {
         // Check the ethertype
         switch (ether_frame.ether_type) {
             .arp => {
-                const arp_frame = try a.ArpPacket.parse(ether_frame.payload);
+                const arp_frame = try arp.ArpPacket.parse(ether_frame.payload);
 
                 var buf_mac: [17]u8 = undefined;
                 std.log.debug("Sender mac : {s}", .{h.macToString(arp_frame.sender_mac[0..], &buf_mac)});
@@ -181,11 +184,11 @@ pub fn main() !void {
                     var arp_payload: [28]u8 = undefined;
                     const arp_reply = arp_frame.createReply(vp.mac_peer, arp_frame.target_ip);
                     try arp_reply.serialize(arp_payload[0..]);
-                    _ = try e.EthernetFrame.build(
+                    _ = try eth.EthernetFrame.build(
                         reply_buf[0..],
                         arp_frame.sender_mac,
                         vp.mac_peer,
-                        e.EtherType.arp,
+                        eth.EtherType.arp,
                         arp_payload[0..],
                     );
 
@@ -196,7 +199,15 @@ pub fn main() !void {
                     std.log.debug("Send ARP reply: {d} bytes", .{bytes_written});
                 }
             },
-            .ipv4 => std.log.warn("IPv4 is not yet supported", .{}),
+            .ipv4 => {
+                const ipv4_packet = try ip.Ipv4Packet.parse(ether_frame.payload);
+                switch (ipv4_packet.protocol) {
+                    .icmp => std.log.warn("ICMP is not yet supported", .{}),
+                    .tcp => std.log.warn("TCP is not yet supported", .{}),
+                    .udp => std.log.warn("UDP is not yet supported", .{}),
+                    _ => |protocol| std.log.err("{d} is an unknown protocol", .{protocol}),
+                }
+            },
             .ipv6 => std.log.warn("IPv6 is not yet supported", .{}),
             .unknown => std.log.warn("Unkown ethertype", .{}),
         }
