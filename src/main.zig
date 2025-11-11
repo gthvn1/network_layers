@@ -46,8 +46,12 @@ pub fn main() !void {
         return error.IfaceNameTooLong;
     }
 
-    std.log.info("params: iface: {s}", .{params.iface});
-    std.log.warn("TODO: if you don't pass the subnet to the ip the route won't be created.", .{});
+    if (std.mem.indexOfScalar(u8, params.ip, '/')) |_| {
+        std.log.info("params: iface: {s}", .{params.iface});
+    } else {
+        std.log.err("An IP address with its subnet is expected (ie 192.168.13.1/24)", .{});
+        return;
+    }
 
     // --------------------------- SETUP ---------------------------------------
     var mac_buf: [17]u8 = undefined;
