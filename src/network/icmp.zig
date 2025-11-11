@@ -31,11 +31,8 @@ pub const IcmpPacket = struct {
     // TODO: we are focusing on echo
     const ICMPSIZE: comptime_int = 8;
 
-    pub fn parse(buf: []const u8) ?IcmpPacket {
-        if (buf.len < ICMPSIZE) {
-            std.log.err("buffer is too small", .{});
-            return null;
-        }
+    pub fn parse(buf: []const u8) !IcmpPacket {
+        if (buf.len < ICMPSIZE) return error.BufferTooSmall;
 
         const icmp_type: IcmpType = @enumFromInt(buf[0]);
         const code = buf[1];

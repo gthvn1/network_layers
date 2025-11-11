@@ -62,32 +62,19 @@ pub const Ipv4Packet = struct {
 
     const MIN_HEADER_SIZE: comptime_int = 20;
 
-    pub fn parse(buf: []const u8) ?Ipv4Packet {
-        if (buf.len < MIN_HEADER_SIZE) {
-            std.log.err("buffer is too small", .{});
-            return null;
-        }
+    pub fn parse(buf: []const u8) !Ipv4Packet {
+        if (buf.len < MIN_HEADER_SIZE) return error.BufferTooSmall;
 
         // Byte 0: Version (4 bits) + IHL (4 bits)
         const version_ihl = buf[0];
         const version: u4 = @truncate(version_ihl >> 4);
         const ihl: u4 = @truncate(version_ihl & 0x0F);
 
-        if (version != 4) {
-            std.log.err("only version 4 is supported", .{});
-            return null;
-        }
-
-        if (ihl < 5) {
-            std.log.err("{d} is an invalid ihl", .{ihl});
-            return null;
-        }
+        if (version != 4) return error.InvalidVersion;
+        if (ihl < 5) return error.InvalidIhl;
 
         const header_len: usize = @as(usize, ihl) * 4;
-        if (buf.len < header_len) {
-            std.log.err("buffer too small", .{});
-            return null;
-        }
+        if (buf.len < header_len) return error.BufferTooSmall;
 
         // Byte 1: DSCP (6 bits) + ECN (2 bits)
         const dscp_ecn = buf[1];
