@@ -1,4 +1,5 @@
 const std = @import("std");
+const NetworkError = @import("error.zig").NetworkError;
 
 // +--------------------------------------------------------+
 // | IPv4 Header (20-60 bytes, typically 20)                |
@@ -43,6 +44,11 @@ pub const IpProtocol = enum(u8) {
     _,
 };
 
+pub const IpError = NetworkError || error{
+    InvalidVersion,
+    InvalidIHL,
+};
+
 pub const Ipv4Packet = struct {
     version: u4, // Should be 4
     ihl: u4, // Header length in 32-bit words (typically 5)
@@ -62,19 +68,19 @@ pub const Ipv4Packet = struct {
 
     const MIN_HEADER_SIZE: comptime_int = 20;
 
-    pub fn parse(buf: []const u8) !Ipv4Packet {
-        if (buf.len < MIN_HEADER_SIZE) return error.BufferTooSmall;
+    pub fn parse(buf: []const u8) IpError!Ipv4Packet {
+        if (buf.len < MIN_HEADER_SIZE) return IpError.BufferTooSmall;
 
         // Byte 0: Version (4 bits) + IHL (4 bits)
         const version_ihl = buf[0];
         const version: u4 = @truncate(version_ihl >> 4);
         const ihl: u4 = @truncate(version_ihl & 0x0F);
 
-        if (version != 4) return error.InvalidVersion;
-        if (ihl < 5) return error.InvalidIhl;
+        if (version != 4) return IpError.InvalidVersion;
+        if (ihl < 5) return IpError.InvalidIHL;
 
         const header_len: usize = @as(usize, ihl) * 4;
-        if (buf.len < header_len) return error.BufferTooSmall;
+        if (buf.len < header_len) return IpError.BufferTooSmall;
 
         // Byte 1: DSCP (6 bits) + ECN (2 bits)
         const dscp_ecn = buf[1];
@@ -159,11 +165,11 @@ pub const Ipv4Packet = struct {
         return @truncate(~sum);
     }
 
-    pub fn serialize(self: Ipv4Packet, buf: []u8) !void {
+    pub fn serialize(self: Ipv4Packet, buf: []u8) IpError!void {
         const header_len = self.getHeaderLength();
         const total_len = header_len + self.payload.len;
 
-        if (buf.len < total_len) return error.BufferTooSmall;
+        if (buf.len < total_len) return IpError.BufferTooSmall;
 
         // Byte 0: Version + IHL
         buf[0] = (@as(u8, self.version) << 4) | @as(u8, self.ihl);

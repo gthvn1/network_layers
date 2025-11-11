@@ -1,4 +1,10 @@
 const std = @import("std");
+const NetworkError = @import("error.zig").NetworkError;
+
+pub const EthernetError = NetworkError || error{
+    PacketTooSmall,
+    PacketTooSmallForVlan,
+};
 
 // https://en.wikipedia.org/wiki/EtherType
 pub const EtherType = enum(u16) {
@@ -15,11 +21,17 @@ pub const EthernetFrame = struct {
     payload: []const u8,
 
     // It takes a payload and encapsulate it in an ethernet frame.
-    pub fn build(buf: []u8, dest_mac: [6]u8, src_mac: [6]u8, ether_type: EtherType, payload: []const u8) !usize {
+    pub fn build(
+        buf: []u8,
+        dest_mac: [6]u8,
+        src_mac: [6]u8,
+        ether_type: EtherType,
+        payload: []const u8,
+    ) EthernetError!usize {
         const header_len = 14;
         const total_len = header_len + payload.len;
 
-        if (buf.len < total_len) return error.BufferTooSmall;
+        if (buf.len < total_len) return EthernetError.BufferTooSmall;
 
         // Destination MAC
         @memcpy(buf[0..6], &dest_mac);
@@ -36,8 +48,8 @@ pub const EthernetFrame = struct {
         return total_len;
     }
 
-    pub fn parse(packet: []const u8) ?EthernetFrame {
-        if (packet.len < 14) return null;
+    pub fn parse(packet: []const u8) EthernetError!EthernetFrame {
+        if (packet.len < 14) return EthernetError.PacketTooSmall;
 
         // At offset 12 we have either the ethertype or a vlan tagged
         var offset: usize = 12;
@@ -47,7 +59,7 @@ pub const EthernetFrame = struct {
         if (bytes == vlan_tagged) {
             // In this case we need to skip the next two bytes (802.1Q tag is 4 bytes)
             offset += 4;
-            if (packet.len < offset + 2) return null;
+            if (packet.len < offset + 2) return EthernetError.PacketTooSmallForVlan;
             bytes = std.mem.readInt(u16, @ptrCast(packet[offset .. offset + 2]), .big);
         }
 

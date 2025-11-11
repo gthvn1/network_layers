@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const h = @import("helper.zig");
+const NetworkError = @import("error.zig").NetworkError;
 
 // +--------------------------------------------------------+
 // | Ethernet Header (14 bytes standard)                    |
@@ -43,6 +44,8 @@ pub const ArpOper = enum(u16) {
     reply = 2,
 };
 
+pub const ArpError = NetworkError;
+
 pub const ArpPacket = struct {
     hw_type: u16, // Hardware type (1 = Ethernet)
     proto_type: u16, // Protocol type (0x0800 = IPv4)
@@ -56,8 +59,8 @@ pub const ArpPacket = struct {
 
     const ARPSIZE: comptime_int = 28;
 
-    pub fn parse(buf: []const u8) !ArpPacket {
-        if (buf.len < ARPSIZE) return error.BufferTooSmall;
+    pub fn parse(buf: []const u8) ArpError!ArpPacket {
+        if (buf.len < ARPSIZE) return ArpError.BufferTooSmall;
 
         const hw_type = std.mem.readInt(u16, buf[0..2], .big);
         const proto_type = std.mem.readInt(u16, buf[2..4], .big);
@@ -90,8 +93,8 @@ pub const ArpPacket = struct {
         };
     }
 
-    pub fn serialize(self: ArpPacket, buf: []u8) !void {
-        if (buf.len < 28) return error.BufferTooSmall;
+    pub fn serialize(self: ArpPacket, buf: []u8) ArpError!void {
+        if (buf.len < 28) return ArpError.BufferTooSmall;
 
         std.mem.writeInt(u16, buf[0..2], self.hw_type, .big);
         std.mem.writeInt(u16, buf[2..4], self.proto_type, .big);

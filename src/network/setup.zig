@@ -1,6 +1,25 @@
 const std = @import("std");
 const helper = @import("helper.zig");
 
+const SetupError = error{
+    Command,
+    ChildCollectOutput,
+    ChildSpawn,
+    ChildWait,
+    DupSlice,
+    FailedConvertMac,
+    IpLinkUp,
+    IpLinkAdd,
+    IpLinkDel,
+    IpAddrAdd,
+    MacNotFoundAfterCreation,
+    ParseInterface,
+    PeerMacNotFoundAfterCreation,
+    PeerNameCreate,
+    PeerNotFound,
+    VethMac,
+};
+
 const Interface = struct {
     ifindex: i32,
     ifname: []const u8,
@@ -35,9 +54,13 @@ pub const VirtPair = struct {
     mac_peer: [6]u8,
 };
 
-pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) !void {
+pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) SetupError!void {
     var peer_iface_buf: [std.posix.IFNAMESIZE:0]u8 = undefined;
-    const peer_iface = try std.fmt.bufPrintZ(&peer_iface_buf, "{s}-peer\x00", .{name});
+    const peer_iface = std.fmt.bufPrintZ(
+        &peer_iface_buf,
+        "{s}-peer\x00",
+        .{name},
+    ) catch return SetupError.PeerNameCreate;
 
     const cmd1 = [_][]const u8{ "ip", "link", "set", name, "up" };
 
@@ -46,7 +69,7 @@ pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) !void {
 
     if (res1.stderr.len > 0) {
         std.log.err("ip link up failed: {s}", .{res1.stderr});
-        return error.IpLinkUpFailed;
+        return SetupError.IpLinkUp;
     }
 
     std.log.info("ip link set {s} up", .{name});
@@ -57,7 +80,7 @@ pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) !void {
 
     if (res2.stderr.len > 0) {
         std.log.err("ip link up failed: {s}", .{res2.stderr});
-        return error.IpLinkUpFailed;
+        return SetupError.IpLinkUp;
     }
 
     std.log.info("ip link set {s} up", .{peer_iface});
@@ -65,7 +88,7 @@ pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) !void {
 
 // TODO: we probably want to keep the name of the peer somewhere instead
 // of reallocating every time.
-pub fn setIp(allocator: std.mem.Allocator, name: []const u8, ip: []const u8) !void {
+pub fn setIp(allocator: std.mem.Allocator, name: []const u8, ip: []const u8) SetupError!void {
     // TODO: check that IP is XX.XX.XX.XX/YY
     const cmd = [_][]const u8{ "ip", "addr", "add", ip, "dev", name };
 
@@ -74,14 +97,18 @@ pub fn setIp(allocator: std.mem.Allocator, name: []const u8, ip: []const u8) !vo
 
     if (res.stderr.len > 0) {
         std.log.err("ip addr add failed: {s}", .{res.stderr});
-        return error.IpAddrAddFailed;
+        return SetupError.IpAddrAdd;
     }
 
     std.log.info("ip addr add {s} dev {s}", .{ ip, name });
 }
 
-pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair {
-    const peer_name = try std.fmt.allocPrint(allocator, "{s}-peer", .{name});
+pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) SetupError!VirtPair {
+    const peer_name = std.fmt.allocPrint(
+        allocator,
+        "{s}-peer",
+        .{name},
+    ) catch return SetupError.PeerNameCreate;
     defer allocator.free(peer_name);
 
     var vp = VirtPair{
@@ -90,13 +117,12 @@ pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair
     };
 
     // First check if it exists
-    const found = getDeviceMac(allocator, name, &vp.mac) catch false;
-    if (found) {
+    if (getDeviceMac(allocator, name, &vp.mac) catch false) {
         // If we found interface "name" we are expecting to find its peer
-        if (try getDeviceMac(allocator, peer_name, &vp.mac_peer)) {
+        if (getDeviceMac(allocator, peer_name, &vp.mac_peer) catch false) {
             return vp;
         }
-        return error.PeerNotFound;
+        return SetupError.PeerNotFound;
     }
 
     // We need to create virtual pair
@@ -107,24 +133,24 @@ pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) !VirtPair
 
     if (res.stderr.len > 0) {
         std.log.err("ip link add failed: {s}", .{res.stderr});
-        return error.IpLinkAddFailed;
+        return SetupError.IpLinkAdd;
     }
 
     std.log.info("ip link add {s} type veth peer name {s}", .{ name, peer_name });
 
     // Now we can get the MAC
-    if (try getDeviceMac(allocator, name, &vp.mac)) {
-        if (try getDeviceMac(allocator, peer_name, &vp.mac_peer)) {
+    if (getDeviceMac(allocator, name, &vp.mac) catch return SetupError.MacNotFoundAfterCreation) {
+        if (getDeviceMac(allocator, peer_name, &vp.mac_peer) catch return SetupError.PeerMacNotFoundAfterCreation) {
             return vp;
         }
-        return error.PeerMissingAfterCreation;
     }
 
-    return error.VethMacFailed;
+    // If we are here we don't find valid virtual pair so creation failed.
+    return SetupError.VethMac;
 }
 
 // Peer is automatically removed by kernel
-pub fn cleanup(allocator: std.mem.Allocator, name: []const u8) !void {
+pub fn cleanup(allocator: std.mem.Allocator, name: []const u8) SetupError!void {
     const cmd = [_][]const u8{ "ip", "link", "del", name };
 
     var res = try runCmd(allocator, &cmd);
@@ -132,18 +158,23 @@ pub fn cleanup(allocator: std.mem.Allocator, name: []const u8) !void {
 
     if (res.stderr.len > 0) {
         std.log.err("ip link del failed: {s}", .{res.stderr});
-        return error.IpLinkDelFailed;
+        return SetupError.IpLinkDel;
     }
 
     std.log.info("ip link del {s}", .{name});
 }
 
-fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) !bool {
+fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) SetupError!bool {
     const cmd = [_][]const u8{ "ip", "-j", "link", "show", name };
     var res = try runCmd(allocator, &cmd);
     defer res.deinit();
 
-    const interfaces = try std.json.parseFromSlice([]Interface, allocator, res.stdout, .{});
+    const interfaces = std.json.parseFromSlice(
+        []Interface,
+        allocator,
+        res.stdout,
+        .{},
+    ) catch return SetupError.ParseInterface;
     defer interfaces.deinit();
 
     if (interfaces.value.len == 0) return false;
@@ -155,7 +186,7 @@ fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) !bo
     const iface = interfaces.value[0];
     if (std.mem.eql(u8, name, iface.ifname)) {
         if (iface.address) |addr| {
-            try helper.stringToMac(addr, buf);
+            helper.stringToMac(addr, buf) catch return SetupError.FailedConvertMac;
             return true;
         }
     }
@@ -163,7 +194,7 @@ fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) !bo
     return false;
 }
 
-fn runCmd(allocator: std.mem.Allocator, command: []const []const u8) !CmdOutput {
+fn runCmd(allocator: std.mem.Allocator, command: []const []const u8) SetupError!CmdOutput {
     const Child = std.process.Child;
 
     // Child inherits stdout & stderr so redirect them.
@@ -176,19 +207,19 @@ fn runCmd(allocator: std.mem.Allocator, command: []const []const u8) !CmdOutput 
     var stderr: std.array_list.Aligned(u8, null) = .empty;
     defer stderr.deinit(allocator);
 
-    try child.spawn();
-    try child.collectOutput(allocator, &stdout, &stderr, 4096);
-    const term = try child.wait();
+    child.spawn() catch return SetupError.ChildSpawn;
+    child.collectOutput(allocator, &stdout, &stderr, 4096) catch return SetupError.ChildCollectOutput;
+    const term = child.wait() catch return SetupError.ChildWait;
 
     if (term.Exited != 0) {
         std.log.err("Command exited with code {}", .{term.Exited});
-        return error.CommandFailed;
+        return SetupError.Command;
     }
 
     // Duplicate slice so the caller will own them since array_list are
     // deallocated.
-    const stdout_dup = try stdout.toOwnedSlice(allocator);
-    const stderr_dup = try stderr.toOwnedSlice(allocator);
+    const stdout_dup = stdout.toOwnedSlice(allocator) catch return SetupError.DupSlice;
+    const stderr_dup = stderr.toOwnedSlice(allocator) catch return SetupError.DupSlice;
 
     return .{
         .stdout = stdout_dup,

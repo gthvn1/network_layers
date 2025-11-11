@@ -1,4 +1,5 @@
 const std = @import("std");
+const NetworkError = @import("error.zig").NetworkError;
 
 // https://datatracker.ietf.org/doc/html/rfc792
 // https://en.wikipedia.org/wiki/Internet_Control_Message_Protocol
@@ -22,6 +23,8 @@ pub const IcmpType = enum(u8) {
     _,
 };
 
+pub const IcmpError = NetworkError;
+
 pub const IcmpPacket = struct {
     icmp_type: IcmpType,
     code: u8,
@@ -31,8 +34,8 @@ pub const IcmpPacket = struct {
     // TODO: we are focusing on echo
     const ICMPSIZE: comptime_int = 8;
 
-    pub fn parse(buf: []const u8) !IcmpPacket {
-        if (buf.len < ICMPSIZE) return error.BufferTooSmall;
+    pub fn parse(buf: []const u8) IcmpError!IcmpPacket {
+        if (buf.len < ICMPSIZE) return IcmpError.BufferTooSmall;
 
         const icmp_type: IcmpType = @enumFromInt(buf[0]);
         const code = buf[1];

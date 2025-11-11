@@ -161,8 +161,13 @@ pub fn main() !void {
             std.debug.print("\n--- Done\n", .{});
         }
 
-        const ether_frame = eth.EthernetFrame.parse(frame_buf[0..n]) orelse {
-            std.log.err("Something goes wrong when getting ethernet frame", .{});
+        const ether_frame = eth.EthernetFrame.parse(frame_buf[0..n]) catch |err| {
+            std.log.err("Failed to parse ethernet frame", .{});
+            switch (err) {
+                eth.EthernetError.BufferTooSmall => std.log.err("-> buffer is too small", .{}),
+                eth.EthernetError.PacketTooSmall => std.log.err("-> packet is too small", .{}),
+                eth.EthernetError.PacketTooSmallForVlan => std.log.err("-> packet is too small to contain vlan", .{}),
+            }
             continue :loop;
         };
 
