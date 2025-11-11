@@ -1,5 +1,5 @@
 const std = @import("std");
-const helper = @import("helper.zig");
+const helper = @import("network.zig").helper;
 
 const SetupError = error{
     Command,
@@ -68,22 +68,22 @@ pub fn linkUpVeth(allocator: std.mem.Allocator, name: []const u8) SetupError!voi
     defer res1.deinit();
 
     if (res1.stderr.len > 0) {
-        std.log.debug("ip link up failed: {s}", .{res1.stderr});
+        std.log.err("ip link up failed: {s}", .{res1.stderr});
         return SetupError.IpLinkUp;
     }
 
-    std.log.debug("ip link set {s} up", .{name});
+    std.log.info("ip link set {s} up", .{name});
     const cmd2 = [_][]const u8{ "ip", "link", "set", peer_iface, "up" };
 
     var res2 = try runCmd(allocator, &cmd2);
     defer res2.deinit();
 
     if (res2.stderr.len > 0) {
-        std.log.debug("ip link up failed: {s}", .{res2.stderr});
+        std.log.err("ip link up failed: {s}", .{res2.stderr});
         return SetupError.IpLinkUp;
     }
 
-    std.log.debug("ip link set {s} up", .{peer_iface});
+    std.log.info("ip link set {s} up", .{peer_iface});
 }
 
 // TODO: we probably want to keep the name of the peer somewhere instead
@@ -96,11 +96,11 @@ pub fn setIp(allocator: std.mem.Allocator, name: []const u8, ip: []const u8) Set
     defer res.deinit();
 
     if (res.stderr.len > 0) {
-        std.log.debug("ip addr add failed: {s}", .{res.stderr});
+        std.log.err("ip addr add failed: {s}", .{res.stderr});
         return SetupError.IpAddrAdd;
     }
 
-    std.log.debug("ip addr add {s} dev {s}", .{ ip, name });
+    std.log.info("ip addr add {s} dev {s}", .{ ip, name });
 }
 
 pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) SetupError!VirtPair {
@@ -132,11 +132,11 @@ pub fn getOrCreateVeth(allocator: std.mem.Allocator, name: []const u8) SetupErro
     defer res.deinit();
 
     if (res.stderr.len > 0) {
-        std.log.debug("ip link add failed: {s}", .{res.stderr});
+        std.log.err("ip link add failed: {s}", .{res.stderr});
         return SetupError.IpLinkAdd;
     }
 
-    std.log.debug("ip link add {s} type veth peer name {s}", .{ name, peer_name });
+    std.log.info("ip link add {s} type veth peer name {s}", .{ name, peer_name });
 
     // Now we can get the MAC
     if (getDeviceMac(allocator, name, &vp.mac) catch return SetupError.MacNotFoundAfterCreation) {
@@ -157,11 +157,11 @@ pub fn cleanup(allocator: std.mem.Allocator, name: []const u8) SetupError!void {
     defer res.deinit();
 
     if (res.stderr.len > 0) {
-        std.log.debug("ip link del failed: {s}", .{res.stderr});
+        std.log.err("ip link del failed: {s}", .{res.stderr});
         return SetupError.IpLinkDel;
     }
 
-    std.log.debug("ip link del {s}", .{name});
+    std.log.info("ip link del {s}", .{name});
 }
 
 fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) SetupError!bool {
@@ -179,7 +179,7 @@ fn getDeviceMac(allocator: std.mem.Allocator, name: []const u8, buf: *[6]u8) Set
 
     if (interfaces.value.len == 0) return false;
     if (interfaces.value.len > 1) {
-        std.log.warn("we found {d} devices for {s}", .{ interfaces.value.len, name });
+        std.log.err("we found {d} devices for {s}", .{ interfaces.value.len, name });
         return false;
     }
 

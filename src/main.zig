@@ -3,11 +3,10 @@ const os = std.os;
 const posix = std.posix;
 
 const p = @import("params.zig");
+const s = @import("setup.zig");
 
 const network = @import("network.zig");
 const h = network.helper;
-
-const s = network.setup;
 
 const arp = network.arp;
 const eth = network.ethernet;
