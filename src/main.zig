@@ -48,10 +48,15 @@ pub fn main() !void {
     }
 
     std.log.info("params: iface: {s}", .{params.iface});
+    std.log.warn("TODO: if you don't pass the subnet to the ip the route won't be created.", .{});
 
     // --------------------------- SETUP ---------------------------------------
     var mac_buf: [17]u8 = undefined;
-    const vp: s.VirtPair = try s.getOrCreateVeth(allocator, params.iface);
+    const vp: s.VirtPair = s.getOrCreateVeth(allocator, params.iface) catch {
+        std.log.err("Failed to get or create virtual pair", .{});
+        std.log.err("Are you root?", .{});
+        return;
+    };
     std.log.info("found mac: {s}", .{h.macToString(vp.mac[0..6], &mac_buf)});
     std.log.info("found mac peer: {s}", .{h.macToString(vp.mac_peer[0..6], &mac_buf)});
 
