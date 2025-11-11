@@ -4,22 +4,11 @@ const h = @import("helper.zig");
 const NetworkError = @import("error.zig").NetworkError;
 
 // +--------------------------------------------------------+
-// | Ethernet Header (14 bytes standard)                    |
-// |--------------------------------------------------------|
-// | Destination MAC (6) | Source MAC (6) | EtherType (2)   |
-// +--------------------------------------------------------+
-//
-// +--------------------------------------------------------+
 // | ARP Payload (28 bytes standard for Ethernet/IPv4)      |
 // |--------------------------------------------------------|
 // | HTYPE (2) | PTYPE (2) | HLEN (1) | PLEN (1) | OPER (2) |
 // | SHA (6) | SPA (4) | THA (6) | TPA (4)                  |
 // +--------------------------------------------------------+
-//
-// Ethernet II layout begins with:
-//   Destination MAC: 6 bytes
-//   Source MAC: 6 bytes
-//   EtherType: 2 bytes (0x0806 -> ARP)
 //
 // [RFC ARP] https://datatracker.ietf.org/doc/html/rfc826
 //
@@ -42,6 +31,7 @@ const NetworkError = @import("error.zig").NetworkError;
 pub const ArpOper = enum(u16) {
     request = 1,
     reply = 2,
+    _,
 };
 
 pub const ArpError = NetworkError;

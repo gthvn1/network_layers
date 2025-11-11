@@ -167,6 +167,7 @@ pub fn main() !void {
                 eth.EthernetError.BufferTooSmall => std.log.err("-> buffer is too small", .{}),
                 eth.EthernetError.PacketTooSmall => std.log.err("-> packet is too small", .{}),
                 eth.EthernetError.PacketTooSmallForVlan => std.log.err("-> packet is too small to contain vlan", .{}),
+                else => std.log.err("unexpected error", .{}),
             }
             continue :loop;
         };

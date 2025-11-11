@@ -14,6 +14,17 @@ pub const EtherType = enum(u16) {
     unknown = 0xffff,
 };
 
+// +--------------------------------------------------------+
+// | Ethernet Header (14 bytes standard)                    |
+// |--------------------------------------------------------|
+// | Destination MAC (6) | Source MAC (6) | EtherType (2)   |
+// +--------------------------------------------------------+
+//
+// Ethernet II layout begins with:
+//   Destination MAC: 6 bytes
+//   Source MAC: 6 bytes
+//   EtherType: 2 bytes (0x0806 -> ARP)
+//
 // https://en.wikipedia.org/wiki/Ethernet_frame
 pub const EthernetFrame = struct {
     ether_type: EtherType,

@@ -1,4 +1,5 @@
 const std = @import("std");
+const NetworkError = @import("error.zig").NetworkError;
 
 // IPv4: xxx.xxx.xxx.xxx = max 15 chars
 pub fn ipv4ToString(ip: []const u8, str_buf: *[15]u8) []const u8 {
@@ -10,25 +11,19 @@ pub fn ipv4ToString(ip: []const u8, str_buf: *[15]u8) []const u8 {
     ) catch "?.?.?.?";
 }
 
-const IpError = error{
-    TooManyOctets,
-    TooFewOctets,
-    InvalidOctet,
-};
-
-pub fn stringToIpv4(ip_str: []const u8, ip_buf: *[4]u8) !void {
+pub fn stringToIpv4(ip_str: []const u8, ip_buf: *[4]u8) NetworkError!void {
     var it = std.mem.splitScalar(u8, ip_str, '.');
     var idx: usize = 0;
 
     while (it.next()) |str| {
-        if (idx >= 4) return IpError.TooManyOctets;
+        if (idx >= 4) break;
 
-        const v = std.fmt.parseInt(u8, str, 10) catch return IpError.InvalidOctet;
+        const v = std.fmt.parseInt(u8, str, 10) catch return NetworkError.InvalidByte;
         ip_buf[idx] = v;
         idx += 1;
     }
 
-    if (idx != 4) return IpError.TooFewOctets;
+    if (idx != 4) return NetworkError.NotEnoughBytes;
 }
 
 // Since MAC addresses are always 6 bytes and the string
@@ -45,24 +40,19 @@ pub fn macToString(mac: []const u8, str_buf: *[17]u8) []const u8 {
     ) catch "??:??:??:??:??:??";
 }
 
-const MacError = error{
-    TooManyBytes,
-    TooFewBytes,
-};
-
-pub fn stringToMac(mac_str: []const u8, mac_buf: *[6]u8) !void {
+pub fn stringToMac(mac_str: []const u8, mac_buf: *[6]u8) NetworkError!void {
     var it = std.mem.splitScalar(u8, mac_str, ':');
     var idx: usize = 0;
 
     while (it.next()) |str| {
-        if (idx >= 6) return MacError.TooManyBytes;
+        if (idx >= 6) break;
 
-        const v = try std.fmt.parseInt(u8, str, 16);
+        const v = std.fmt.parseInt(u8, str, 16) catch return NetworkError.InvalidByte;
         mac_buf[idx] = v;
         idx += 1;
     }
 
-    if (idx != 6) return MacError.TooFewBytes;
+    if (idx != 6) return NetworkError.NotEnoughBytes;
 }
 
 test "macToString_failed" {
