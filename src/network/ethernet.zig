@@ -15,11 +15,20 @@ pub const EthernetFrame = struct {
     payload: []const u8,
 
     // It takes a payload and encapsulate it in an ethernet frame.
-    pub fn build(buf: []u8, dest_mac: [6]u8, src_mac: [6]u8, ether_type: EtherType, payload: []const u8) !usize {
+    pub fn build(
+        buf: []u8,
+        dest_mac: [6]u8,
+        src_mac: [6]u8,
+        ether_type: EtherType,
+        payload: []const u8,
+    ) ?usize {
         const header_len = 14;
         const total_len = header_len + payload.len;
 
-        if (buf.len < total_len) return error.BufferTooSmall;
+        if (buf.len < total_len) {
+            std.log.err("buffer too small", .{});
+            return null;
+        }
 
         // Destination MAC
         @memcpy(buf[0..6], &dest_mac);

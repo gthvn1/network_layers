@@ -168,8 +168,8 @@ pub fn main() !void {
 
         // Check the ethertype
         switch (ether_frame.ether_type) {
-            .arp => try handleArp(sockfd, ether_frame, vp.mac_peer),
-            .ipv4 => try handleIpv4(sockfd, ether_frame),
+            .arp => handleArp(sockfd, ether_frame, vp.mac_peer),
+            .ipv4 => handleIpv4(sockfd, ether_frame),
             .ipv6 => std.log.warn("IPv6 is not yet supported", .{}),
             .unknown => std.log.warn("Unkown ethertype", .{}),
         }
@@ -178,13 +178,13 @@ pub fn main() !void {
     std.debug.print("Cleaning in progress...\n", .{});
 }
 
-fn handleIpv4(sockfd: std.posix.fd_t, frame: eth.EthernetFrame) !void {
+fn handleIpv4(sockfd: std.posix.fd_t, frame: eth.EthernetFrame) void {
     _ = sockfd;
 
-    const ipv4_packet = try ip.Ipv4Packet.parse(frame.payload);
+    const ipv4_packet = ip.Ipv4Packet.parse(frame.payload) orelse return;
     switch (ipv4_packet.protocol) {
         .icmp => {
-            const icmp_packet = try icmp.IcmpPacket.parse(ipv4_packet.payload);
+            const icmp_packet = icmp.IcmpPacket.parse(ipv4_packet.payload) orelse return;
             switch (icmp_packet.icmp_type) {
                 .echo_request => icmp.dump(ipv4_packet.payload),
                 else => std.log.warn("Only ICMP echo are supported", .{}),
@@ -196,8 +196,11 @@ fn handleIpv4(sockfd: std.posix.fd_t, frame: eth.EthernetFrame) !void {
     }
 }
 
-fn handleArp(sockfd: std.posix.fd_t, frame: eth.EthernetFrame, mac_peer: [6]u8) !void {
-    const arp_frame = try arp.ArpPacket.parse(frame.payload);
+fn handleArp(sockfd: std.posix.fd_t, frame: eth.EthernetFrame, mac_peer: [6]u8) void {
+    const arp_frame = arp.ArpPacket.parse(frame.payload) orelse {
+        std.log.err("Failed to parse ARP", .{});
+        return;
+    };
 
     var buf_mac: [17]u8 = undefined;
     std.log.debug("Sender mac : {s}", .{h.macToString(arp_frame.sender_mac[0..], &buf_mac)});
@@ -212,14 +215,14 @@ fn handleArp(sockfd: std.posix.fd_t, frame: eth.EthernetFrame, mac_peer: [6]u8) 
         var reply_buf: [42]u8 = undefined;
         var arp_payload: [28]u8 = undefined;
         const arp_reply = arp_frame.createReply(mac_peer, arp_frame.target_ip);
-        try arp_reply.serialize(arp_payload[0..]);
-        _ = try eth.EthernetFrame.build(
-            reply_buf[0..],
-            arp_frame.sender_mac,
-            mac_peer,
-            eth.EtherType.arp,
-            arp_payload[0..],
-        );
+        arp_reply.serialize(arp_payload[0..]) orelse {
+            std.log.err("Failed to serialize ARP", .{});
+            return;
+        };
+        _ = eth.EthernetFrame.build(reply_buf[0..], arp_frame.sender_mac, mac_peer, eth.EtherType.arp, arp_payload[0..]) orelse {
+            std.log.err("Failed to build ethernet frame", .{});
+            return;
+        };
 
         const bytes_written = posix.write(sockfd, reply_buf[0..]) catch |err| {
             std.log.err("Failed to write arp reply: {s}", .{@errorName(err)});

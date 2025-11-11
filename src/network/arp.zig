@@ -56,8 +56,11 @@ pub const ArpPacket = struct {
 
     const ARPSIZE: comptime_int = 28;
 
-    pub fn parse(buf: []const u8) !ArpPacket {
-        if (buf.len < ARPSIZE) return error.BufferTooSmall;
+    pub fn parse(buf: []const u8) ?ArpPacket {
+        if (buf.len < ARPSIZE) {
+            std.log.err("buffer too small", .{});
+            return null;
+        }
 
         const hw_type = std.mem.readInt(u16, buf[0..2], .big);
         const proto_type = std.mem.readInt(u16, buf[2..4], .big);
@@ -90,8 +93,11 @@ pub const ArpPacket = struct {
         };
     }
 
-    pub fn serialize(self: ArpPacket, buf: []u8) !void {
-        if (buf.len < 28) return error.BufferTooSmall;
+    pub fn serialize(self: ArpPacket, buf: []u8) ?void {
+        if (buf.len < 28) {
+            std.log.err("buffer too small", .{});
+            return null;
+        }
 
         std.mem.writeInt(u16, buf[0..2], self.hw_type, .big);
         std.mem.writeInt(u16, buf[2..4], self.proto_type, .big);
